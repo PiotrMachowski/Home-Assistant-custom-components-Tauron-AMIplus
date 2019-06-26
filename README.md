@@ -41,10 +41,10 @@ sensor:
 
 ## Instalation
 
-Download [*sensor.py*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/sensor.py) and [*manifest.json*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/manifest.json) to `config/custom_compoments/tauron_amiplus` directory:
+Download [*sensor.py*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/sensor.py) and [*manifest.json*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/manifest.json) to `config/custom_components/tauron_amiplus` directory:
 ```bash
-mkdir -p custom_compoments/tauron_amiplus
-cd custom_compoments/tauron_amiplus
+mkdir -p custom_components/tauron_amiplus
+cd custom_components/tauron_amiplus
 wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/sensor.py
 wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/manifest.json
 ```
