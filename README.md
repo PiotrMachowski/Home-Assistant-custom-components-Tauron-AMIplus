@@ -41,12 +41,12 @@ sensor:
 
 ## Instalation
 
-Download [*sensor.py*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/sensor.py) and [*manifest.json*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/manifest.json) to `config/custom_components/tauron_amiplus` directory:
+Download [*sensor.py*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/sensor.py) and [*manifest.json*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/manifest.json) to `config/custom_components/tauron_amiplus` directory:
 ```bash
 mkdir -p custom_components/tauron_amiplus
 cd custom_components/tauron_amiplus
-wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/sensor.py
-wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/manifest.json
+wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/sensor.py
+wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/manifest.json
 ```
 
 ## FAQ
