@@ -1,0 +1,5 @@
+{
+  "name": "Tauron AMIplus sensor",
+  "domains": ["sensor"],
+  "country": "PL"
+}
