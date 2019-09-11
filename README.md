@@ -1,5 +1,7 @@
 # Tauron AMIplus sensor
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
+
 This sensor uses unofficial API to get energy usage data from [*TAURON eLicznik*](https://elicznik.tauron-dystrybucja.pl).
 
 WARNING: Currently it only supports G11 and G12 tariffs.
