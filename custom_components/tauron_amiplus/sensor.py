@@ -13,8 +13,9 @@ from homeassistant.util import Throttle
 _LOGGER = logging.getLogger(__name__)
 
 CONF_METER_ID = 'energy_meter_id'
+CONF_GENERATION = 'check_generation'
 
-DEFAULT_NAME = 'Tauron AmiPlus'
+DEFAULT_NAME = 'Tauron AMIPlus'
 
 MIN_TIME_BETWEEN_UPDATES = datetime.timedelta(seconds=60)
 
@@ -22,6 +23,7 @@ ZONE = 'zone'
 CONSUMPTION_DAILY = 'consumption_daily'
 CONSUMPTION_MONTHLY = 'consumption_monthly'
 CONSUMPTION_YEARLY = 'consumption_yearly'
+
 SENSOR_TYPES = {
     ZONE: [timedelta(minutes=1), None],
     CONSUMPTION_DAILY: [timedelta(hours=1), 'kWh'],
@@ -38,6 +40,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_MONITORED_VARIABLES, default=[]):
         vol.All(cv.ensure_list, [vol.In(SENSOR_TYPES)]),
     vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
+    vol.Optional(CONF_GENERATION, default=False): cv.boolean,
 })
 
 
@@ -46,10 +49,11 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     username = config.get(CONF_USERNAME)
     password = config.get(CONF_PASSWORD)
     meter_id = config.get(CONF_METER_ID)
+    generation = config.get(CONF_GENERATION)
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
         dev.append(
-            TauronAmiplusSensor(name, username, password, meter_id, variable, SENSOR_TYPES[variable][1],
+            TauronAmiplusSensor(name, username, password, meter_id, generation, variable, SENSOR_TYPES[variable][1],
                                 SENSOR_TYPES[variable][0]))
     add_entities(dev, True)
 
@@ -101,13 +105,15 @@ class TauronAmiplusSensor(Entity):
     }
     payload_charts = {
         "dane[cache]": 0,
+        "dane[chartType]": 2
     }
 
-    def __init__(self, name, username, password, meter_id, sensor_type, unit, interval: timedelta):
+    def __init__(self, name, username, password, meter_id, generation, sensor_type, unit, interval: timedelta):
         self.client_name = name
         self.username = username
         self.password = password
         self.meter_id = meter_id
+        self.generation = generation
         self.sensor_type = sensor_type
         self.unit = unit
         configuration = calculate_configuration(username, password, meter_id)
@@ -197,7 +203,7 @@ class TauronAmiplusSensor(Entity):
             "dane[chartDay]": (datetime.datetime.now() - datetime.timedelta(1)).strftime('%d.%m.%Y'),
             "dane[paramType]": "day",
             "dane[smartNr]": self.meter_id,
-            "dane[chartType]": 2
+            "dane[checkOZE]": "on" if self.generation else "off"
         }
         response = session.request("POST", TauronAmiplusSensor.url_charts,
                                    data={**TauronAmiplusSensor.payload_charts, **payload},
@@ -211,7 +217,7 @@ class TauronAmiplusSensor(Entity):
                 "dane[chartDay]": (datetime.datetime.now() - datetime.timedelta(2)).strftime('%d.%m.%Y'),
                 "dane[paramType]": "day",
                 "dane[smartNr]": self.meter_id,
-                "dane[chartType]": 2
+                "dane[checkOZE]": "on" if self.generation else "off"
             }
             response = session.request("POST", TauronAmiplusSensor.url_charts,
                                        data={**TauronAmiplusSensor.payload_charts, **payload},
@@ -229,6 +235,8 @@ class TauronAmiplusSensor(Entity):
                 sum_z2 = round(sum(float(val['EC']) for val in z2), 3)
                 day = values[0]['Date']
                 self.params = {'zone1': sum_z1, 'zone2': sum_z2, 'day': day}
+            if self.generation:
+                self.params = {**self.params, 'generation': round(float(json_data['OZEValue']), 3)}
 
     def update_consumption_monthly(self):
         session = self.get_session()
@@ -237,7 +245,7 @@ class TauronAmiplusSensor(Entity):
             "dane[chartYear]": datetime.datetime.now().year,
             "dane[paramType]": "month",
             "dane[smartNr]": self.meter_id,
-            "dane[chartType]": 2
+            "dane[checkOZE]": "on" if self.generation else "off"
         }
         response = session.request("POST", TauronAmiplusSensor.url_charts,
                                    data={**TauronAmiplusSensor.payload_charts, **payload},
@@ -245,6 +253,7 @@ class TauronAmiplusSensor(Entity):
         if response.status_code == 200 and response.text.startswith('{"name"'):
             json_data = response.json()
             self._state = round(float(json_data['sum']), 3)
+            self.params = {}
             if self.mode == TARIFF_G12:
                 values = json_data['dane']['chart']
                 z1 = list(filter(lambda x: 'tariff1' in x, values))
@@ -252,6 +261,8 @@ class TauronAmiplusSensor(Entity):
                 sum_z1 = round(sum(float(val['tariff1']) for val in z1), 3)
                 sum_z2 = round(sum(float(val['tariff2']) for val in z2), 3)
                 self.params = {'zone1': sum_z1, 'zone2': sum_z2}
+            if self.generation:
+                self.params = {**self.params, 'generation': round(float(json_data['OZEValue']), 3)}
 
     def update_consumption_yearly(self):
         session = self.get_session()
@@ -259,7 +270,8 @@ class TauronAmiplusSensor(Entity):
             "dane[chartYear]": datetime.datetime.now().year,
             "dane[paramType]": "year",
             "dane[smartNr]": self.meter_id,
-            "dane[chartType]": 2
+            "dane[chartType]": 2,
+            "dane[checkOZE]": "on" if self.generation else "off"
         }
         response = session.request("POST", TauronAmiplusSensor.url_charts,
                                    data={**TauronAmiplusSensor.payload_charts, **payload},
@@ -267,6 +279,7 @@ class TauronAmiplusSensor(Entity):
         if response.status_code == 200 and response.text.startswith('{"name"'):
             json_data = response.json()
             self._state = round(float(json_data['sum']), 3)
+            self.params = {}
             if self.mode == TARIFF_G12:
                 values = json_data['dane']['chart']
                 z1 = list(filter(lambda x: 'tariff1' in x, values))
@@ -274,3 +287,5 @@ class TauronAmiplusSensor(Entity):
                 sum_z1 = round(sum(float(val['tariff1']) for val in z1), 3)
                 sum_z2 = round(sum(float(val['tariff2']) for val in z2), 3)
                 self.params = {'zone1': sum_z1, 'zone2': sum_z2}
+            if self.generation:
+                self.params = {**self.params, 'generation': round(float(json_data['OZEValue']), 3)}

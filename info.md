@@ -1,4 +1,4 @@
-This sensor uses unofficial API to get energy usage data from [*TAURON eLicznik*](https://elicznik.tauron-dystrybucja.pl).
+This sensor uses unofficial API to get energy usage and generation data from [*TAURON eLicznik*](https://elicznik.tauron-dystrybucja.pl).
 
 WARNING: Currently it only supports G11 and G12 tariffs.
 
@@ -10,6 +10,7 @@ WARNING: Currently it only supports G11 and G12 tariffs.
 | `username` | `string` | `True` | - | Username used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
 | `password` | `string` | `True` | - | Password used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
 | `energy_meter_id` | `string` | `True` | - | ID of energy meter |
+| `check_generation` | `boolean` | `False` | `false` | Enables checking energy generation |
 | `monitored_variables` | `list` | `True` | - | List of variables to monitor |
 
 ### Possible monitored conditions
