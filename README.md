@@ -25,6 +25,9 @@ WARNING: Currently it only supports G11 and G12 tariffs.
 | `consumption_daily` | Daily energy consumption **(for previous day!)** |
 | `consumption_monthly` | Monthly energy consumption |
 | `consumption_yearly` | Yearly energy consumption |
+| `generation_daily` | Daily energy generation **(for previous day!)** |
+| `generation_monthly` | Monthly energy generation |
+| `generation_yearly` | Yearly energy generation |
 
 ## Example usage
 
@@ -35,11 +38,15 @@ sensor:
     username: !secret tauron_amiplus.username
     password: !secret tauron_amiplus.password
     energy_meter_id: !secret tauron_amiplus.energy_meter_id
+    check_generation: true
     monitored_variables:
       - zone
       - consumption_daily
       - consumption_monthly
       - consumption_yearly
+      - generation_daily
+      - generation_monthly
+      - generation_yearly
 ```
 
 ## Installation
