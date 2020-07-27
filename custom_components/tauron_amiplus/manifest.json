@@ -3,6 +3,6 @@
   "name": "Tauron AMIplus",
   "documentation": "https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus",
   "dependencies": [],
-  "codeowners": ["PiotrMachowski"],
+  "codeowners": ["@PiotrMachowski"],
   "requirements": ["requests"]
 }
