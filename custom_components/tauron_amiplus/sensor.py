@@ -97,7 +97,7 @@ def calculate_configuration(username, password, meter_id, days_before=2):
         stop = datetime.time(parsed_zones[next_i]['start'].hour)
         calculated_zones.append({'start': start, 'stop': stop})
     power_zones = {1: parsed_zones, 2: calculated_zones}
-    tariff = json_data['dane']['chart'][0]['Taryfa']
+    tariff = json_data['dane']['chart']['1']['Taryfa']
     return power_zones, tariff, config_date.strftime('%d.%m.%Y, %H:%M')
 
 
