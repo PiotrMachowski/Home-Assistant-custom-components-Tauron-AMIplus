@@ -236,7 +236,7 @@ class TauronAmiplusSensor(Entity):
             json_data = response.json()
             self._state = round(float(json_data[self.state_param]), 3)
             if self.mode == TARIFF_G12:
-                values = json_data['dane']['chart']
+                values = list(json_data['dane']['chart'].values())
                 z1 = list(filter(lambda x: x['Zone'] == '1', values))
                 z2 = list(filter(lambda x: x['Zone'] == '2', values))
                 sum_z1 = round(sum(float(val['EC']) for val in z1), 3)
