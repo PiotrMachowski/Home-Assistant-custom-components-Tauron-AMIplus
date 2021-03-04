@@ -4,5 +4,6 @@
   "documentation": "https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus",
   "dependencies": [],
   "codeowners": ["@PiotrMachowski"],
-  "requirements": ["requests"]
+  "requirements": ["requests"],
+  "version": "v1.1.4"
 }
