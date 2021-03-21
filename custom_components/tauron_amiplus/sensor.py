@@ -1,6 +1,9 @@
 import datetime
 import logging
 from datetime import timedelta
+from requests import adapters
+import ssl
+from urllib3 import poolmanager
 
 import homeassistant.helpers.config_validation as cv
 import requests
@@ -49,6 +52,21 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_GENERATION, default=False): cv.boolean,
 })
 
+# to fix the SSLError
+class TLSAdapter(adapters.HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        """Create and initialize the urllib3 PoolManager."""
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+        ctx.check_hostname = False
+        self.poolmanager = poolmanager.PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            ssl_version=ssl.PROTOCOL_TLS,
+            ssl_context=ctx,
+        )
+
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     name = config.get(CONF_NAME)
@@ -69,6 +87,7 @@ def calculate_configuration(username, password, meter_id, days_before=2):
         "service": "https://elicznik.tauron-dystrybucja.pl"
     }
     session = requests.session()
+    session.mount("https://", TLSAdapter())
     session.request("POST", TauronAmiplusSensor.url_login, data=payload_login,
                     headers=TauronAmiplusSensor.headers)
     session.request("POST", TauronAmiplusSensor.url_login, data=payload_login,
@@ -173,6 +192,7 @@ class TauronAmiplusSensor(Entity):
             "service": "https://elicznik.tauron-dystrybucja.pl"
         }
         session = requests.session()
+        session.mount("https://", TLSAdapter())
         session.request("POST", TauronAmiplusSensor.url_login, data=payload_login,
                         headers=TauronAmiplusSensor.headers)
         session.request("POST", TauronAmiplusSensor.url_login, data=payload_login,
