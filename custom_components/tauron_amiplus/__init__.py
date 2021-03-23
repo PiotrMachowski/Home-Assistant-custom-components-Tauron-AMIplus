@@ -184,7 +184,7 @@ class TauronAmiplusSensor(Entity):
     @property
     def device_info(self):
         return {
-            "identifiers": {(DOMAIN, "ais-dom-elicznik")},
+            "identifiers": {(DOMAIN, "elicznik")},
             "name": "eLicznik",
             "manufacturer": "TAURON",
             "model": "Taryfa dystrybucyjna: " + self.mode,

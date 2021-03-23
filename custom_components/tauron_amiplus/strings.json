@@ -13,7 +13,7 @@
                 }
             },
            "confirm": {
-                "description": "###### ![Tauron logo](https://ai-speaker.com/images/brands/ais_tauron/logo.png)\n\nThis sensor uses unofficial API to get energy usage data from TAURON eLicznik. Do you want to continue?\n",
+                "description": "This sensor uses unofficial API to get energy usage data from TAURON eLicznik. Do you want to continue?\n",
                 "title": "Tauron AMIplus sensors"
            }
         },

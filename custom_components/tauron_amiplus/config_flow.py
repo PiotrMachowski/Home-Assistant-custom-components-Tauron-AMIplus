@@ -22,8 +22,8 @@ def configured_tauron_connectoin(hass):
     }
 
 
-class AisTauronFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
-    """AIS TAURON config flow."""
+class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+    """TAURON config flow."""
 
     VERSION = 1
 
@@ -66,7 +66,7 @@ class AisTauronFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     False,
                     ZONE,
                 )
-                _LOGGER.info("AIS TAURON " + str(test.mode))
+                _LOGGER.info("TAURON " + str(test.mode))
                 if test.mode is not None:
                     """Finish config flow"""
                     return self.async_create_entry(title="eLicznik", data=user_input)
