@@ -185,7 +185,7 @@ class TauronAmiplusSensor(Entity):
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self.meter_id)},
-            "name": "eLicznik",
+            "name": f"eLicznik {self.meter_id}",
             "manufacturer": "TAURON",
             "model": self.meter_id,
             "sw_version": "Tariff " + self.mode,
@@ -199,7 +199,7 @@ class TauronAmiplusSensor(Entity):
 
     @property
     def name(self):
-        return f"{DEFAULT_NAME} {self.client_name}"
+        return f"{DEFAULT_NAME} {self.meter_id} {self.client_name}"
 
     @property
     def state(self):
