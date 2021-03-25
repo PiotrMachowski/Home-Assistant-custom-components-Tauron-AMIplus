@@ -1,4 +1,4 @@
-"""Support for OpenUV sensors."""
+"""Support for TAURON sensors."""
 import logging
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -16,14 +16,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up a TAURON sensor based on a config entry."""
-    user = (entry.data[CONF_USERNAME],)
-    password = (entry.data[CONF_PASSWORD],)
-    meter_id = (entry.data[CONF_METER_ID],)
-    show_generation_sensors = (entry.data[CONF_SHOW_GENERATION],)
+    user = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+    meter_id = entry.data[CONF_METER_ID]
+    show_generation_sensors = entry.data[CONF_SHOW_GENERATION]
     sensors = []
     for sensor_type in SENSOR_TYPES:
-        generation = True if "generation" == SENSOR_TYPES[sensor_type][3][0] else False
-        if generation is False or show_generation_sensors:
+        if not (sensor_type.startswith("generation") and not show_generation_sensors):
             sensor_name = SENSOR_TYPES[sensor_type][4]
             sensors.append(
                 TauronSensor(
@@ -31,7 +30,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                     user,
                     password,
                     meter_id,
-                    generation,
+                    show_generation_sensors,
                     sensor_type,
                 )
             )

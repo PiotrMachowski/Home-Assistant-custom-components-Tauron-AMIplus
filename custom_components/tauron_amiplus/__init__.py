@@ -184,22 +184,22 @@ class TauronAmiplusSensor(Entity):
     @property
     def device_info(self):
         return {
-            "identifiers": {(DOMAIN, "elicznik")},
+            "identifiers": {(DOMAIN, self.unique_id)},
             "name": "eLicznik",
             "manufacturer": "TAURON",
-            "model": "Taryfa dystrybucyjna: " + self.mode,
-            "sw_version": self.meter_id,
+            "model": self.meter_id,
+            "sw_version": "Tariff: " + self.mode,
             "via_device": None,
         }
 
     @property
     def unique_id(self):
         """Return a unique ID."""
-        return f"tauron-{self.mode.lower()}-{self.sensor_type.lower()}"
+        return f"tauron-{self.meter_id}-{self.mode.lower()}-{self.sensor_type.lower()}"
 
     @property
     def name(self):
-        return f"{self.client_name} {self.sensor_type}"
+        return f"{DEFAULT_NAME} {self.client_name}"
 
     @property
     def state(self):

@@ -5,21 +5,12 @@ import logging
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import callback
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
 from . import TauronAmiplusSensor
 from .const import CONF_METER_ID, CONF_SHOW_GENERATION, DOMAIN, ZONE
 
 _LOGGER = logging.getLogger(__name__)
-
-
-@callback
-def configured_tauron_connectoin(hass):
-    """Return a set of the configured supla hosts."""
-    return {
-        entry.data.get(CONF_NAME) for entry in hass.config_entries.async_entries(DOMAIN)
-    }
 
 
 class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -32,7 +23,9 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         pass
 
     async def async_step_import(self, import_config):
-        """Import the supla server as config entry."""
+        """Import a config entry."""
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
         _LOGGER.warning("Go to async_step_user")
         return await self.async_step_init(user_input=import_config)
 

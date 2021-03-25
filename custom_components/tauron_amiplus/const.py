@@ -21,47 +21,47 @@ TYPE_GENERATION_YEARLY = "generation_yearly"
 ZONE = "zone"
 TARIFF_G12 = "G12"
 SENSOR_TYPES = {
-    TYPE_ZONE: [timedelta(hours=1), "kWh", "sum", ("generation", "OZEValue"), "Strefa"],
+    TYPE_ZONE: [timedelta(hours=1), "kWh", "sum", ("generation", "OZEValue"), "Zone"],
     TYPE_CONSUMPTION_DAILY: [
         timedelta(hours=1),
         "kWh",
         "sum",
         ("generation", "OZEValue"),
-        "Dzienne zużycie energii",
+        "Daily energy consumption",
     ],
     TYPE_CONSUMPTION_MONTHLY: [
         timedelta(hours=1),
         "kWh",
         "sum",
         ("generation", "OZEValue"),
-        "Miesięczne zużycie energii",
+        "Monthly energy consumption",
     ],
     TYPE_CONSUMPTION_YEARLY: [
         timedelta(hours=1),
         "kWh",
         "sum",
         ("generation", "OZEValue"),
-        "Roczne zużycie energii",
+        "Yearly energy consumption",
     ],
     TYPE_GENERATION_DAILY: [
         timedelta(hours=1),
         "kWh",
         "OZEValue",
         ("consumption", "sum"),
-        "Dzienna energia oddana do sieci",
+        "Daily energy generation",
     ],
     TYPE_GENERATION_MONTHLY: [
         timedelta(hours=1),
         "kWh",
         "OZEValue",
         ("consumption", "sum"),
-        "Miesięczna energia oddana do sieci",
+        "Monthly energy generation",
     ],
     TYPE_GENERATION_YEARLY: [
         timedelta(hours=1),
         "kWh",
         "OZEValue",
         ("consumption", "sum"),
-        "Roczna energia oddana do sieci",
+        "Yearly energy generation",
     ],
 }
