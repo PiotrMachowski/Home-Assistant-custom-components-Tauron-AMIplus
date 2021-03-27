@@ -7,7 +7,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
-from . import TauronAmiplusSensor
+from .sensor import TauronAmiplusConfigFlowSensor
 from .const import CONF_METER_ID, CONF_SHOW_GENERATION, DOMAIN, ZONE
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,11 +21,6 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Initialize TAURON configuration flow."""
         pass
-
-    async def async_step_import(self, import_config):
-        """Import a config entry."""
-        _LOGGER.warning("Go to async_step_user")
-        return await self.async_step_init(user_input=import_config)
 
     async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
@@ -47,7 +42,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 # Test the connection
-                test = TauronAmiplusSensor(
+                test = TauronAmiplusConfigFlowSensor(
                     "Tauron AMIPlus",
                     user_input[CONF_USERNAME],
                     user_input[CONF_PASSWORD],
