@@ -70,12 +70,13 @@ sensor:
  
 ### Manual
 
-Download [*sensor.py*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/sensor.py) and [*manifest.json*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/manifest.json) to `config/custom_components/tauron_amiplus` directory:
+Download [*tauron_amiplus.zip*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases/latest/download/tauron_amiplus.zip) extract its contents to `config/custom_components/tauron_amiplus` directory:
 ```bash
 mkdir -p custom_components/tauron_amiplus
 cd custom_components/tauron_amiplus
-wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/sensor.py
-wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/manifest.json
+wget https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases/latest/download/tauron_amiplus.zip
+unzip tauron_amiplus.zip
+rm tauron_amiplus.zip
 ```
 
 ## FAQ
