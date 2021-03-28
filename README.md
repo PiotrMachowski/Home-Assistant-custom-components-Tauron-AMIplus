@@ -6,9 +6,19 @@
 
 This sensor uses unofficial API to get energy usage and generation data from [*TAURON eLicznik*](https://elicznik.tauron-dystrybucja.pl).
 
-WARNING: Currently it only supports G11 and G12 tariffs.
+WARNING: Currently it only supports zones detection for G12 tariff.
 
-## Configuration options
+## Configuration
+
+### Config flow (recommended)
+
+To configure this integration go to: _Configuration_ -> _Integrations_ -> _Add integration_ -> _Tauron AMIplus_.
+
+You can also use following [My Home Assistant]() link
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=tauron_amiplus)
+
+### Manual - yaml
 
 | Key | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -52,6 +62,13 @@ sensor:
 ```
 
 ## Installation
+
+### Using [HACS](https://hacs.xyz/) (recommended)
+
+* In _Integrations_ section add repository "Tauron AMIplus"
+* Install added repository
+ 
+### Manual
 
 Download [*sensor.py*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/sensor.py) and [*manifest.json*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/raw/master/custom_components/tauron_amiplus/manifest.json) to `config/custom_components/tauron_amiplus` directory:
 ```bash

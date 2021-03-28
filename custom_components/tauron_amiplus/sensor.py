@@ -17,10 +17,13 @@ from homeassistant.util import Throttle
 from .const import (
     CONF_GENERATION, CONF_METER_ID,
     CONF_SHOW_GENERATION,
+    CONF_TARIFF,
     DEFAULT_NAME,
     DOMAIN,
     SENSOR_TYPES,
+    SUPPORTED_TARIFFS,
     TARIFF_G12,
+    TYPE_ZONE,
     ZONE,
 )
 
@@ -57,8 +60,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
     password = entry.data[CONF_PASSWORD]
     meter_id = entry.data[CONF_METER_ID]
     show_generation_sensors = entry.data[CONF_SHOW_GENERATION]
+    tariff = entry.data[CONF_TARIFF]
     sensors = []
-    for sensor_type in SENSOR_TYPES:
+    sensor_types = {**SENSOR_TYPES}
+    if tariff not in SUPPORTED_TARIFFS:
+        sensor_types.pop(TYPE_ZONE)
+    for sensor_type in sensor_types:
         if not (sensor_type.startswith("generation") and not show_generation_sensors):
             sensor_name = SENSOR_TYPES[sensor_type][4]
             sensors.append(
@@ -111,7 +118,7 @@ class TauronAmiplusSensor(Entity):
         self.unit = SENSOR_TYPES[sensor_type][1]
         configuration = TauronAmiplusSensor.calculate_configuration(username, password, meter_id)
         self.power_zones = configuration[0]
-        self.mode = configuration[1]
+        self.tariff = configuration[1]
         self.power_zones_last_update = configuration[2]
         self.power_zones_last_update_tech = (
                 datetime.datetime.now() - datetime.timedelta(days=1)
@@ -187,8 +194,8 @@ class TauronAmiplusSensor(Entity):
     @property
     def device_state_attributes(self):
         _params = {
-            "tariff": self.mode,
-            "updated": self.power_zones_last_update,
+            "tariff": self.tariff,
+            "zones_updated": self.power_zones_last_update,
             **self.params,
         }
         return _params
@@ -243,12 +250,12 @@ class TauronAmiplusSensor(Entity):
                 self.username, self.password, self.meter_id, 1
             )
             self.power_zones = config[0]
-            self.mode = config[1]
+            self.tariff = config[1]
             self.power_zones_last_update = config[2]
             self.power_zones_last_update_tech = now_datetime
 
     def update_zone(self):
-        if self.mode == TARIFF_G12:
+        if self.tariff == TARIFF_G12:
             parsed_zones = self.power_zones[1]
             now_time = datetime.datetime.now().time()
             if (
@@ -330,7 +337,7 @@ class TauronAmiplusSensor(Entity):
         if correct_data:
             json_data = response.json()
             self._state = round(float(json_data[self.state_param]), 3)
-            if self.mode == TARIFF_G12:
+            if self.tariff == TARIFF_G12:
                 values = list(json_data["dane"]["chart"].values())
                 z1 = list(filter(lambda x: x["Zone"] == "1", values))
                 z2 = list(filter(lambda x: x["Zone"] == "2", values))
@@ -365,7 +372,7 @@ class TauronAmiplusSensor(Entity):
             json_data = response.json()
             self._state = round(float(json_data[self.state_param]), 3)
             self.params = {}
-            if self.mode == TARIFF_G12:
+            if self.tariff == TARIFF_G12:
                 values = json_data["dane"]["chart"]
                 z1 = list(filter(lambda x: "tariff1" in x, values))
                 z2 = list(filter(lambda x: "tariff2" in x, values))
@@ -399,7 +406,7 @@ class TauronAmiplusSensor(Entity):
             json_data = response.json()
             self._state = round(float(json_data[self.state_param]), 3)
             self.params = {}
-            if self.mode == TARIFF_G12:
+            if self.tariff == TARIFF_G12:
                 values = json_data["dane"]["chart"]
                 z1 = list(filter(lambda x: "tariff1" in x, values))
                 z2 = list(filter(lambda x: "tariff2" in x, values))
@@ -417,7 +424,7 @@ class TauronAmiplusSensor(Entity):
     @property
     def unique_id(self):
         """Return a unique ID."""
-        return f"tauron-yaml-{self.meter_id}-{self.mode.lower()}-{self.sensor_type.lower()}"
+        return f"tauron-yaml-{self.meter_id}-{self.sensor_type.lower()}"
 
 
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
@@ -433,7 +440,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "name": f"eLicznik {self.meter_id}",
             "manufacturer": "TAURON",
             "model": self.meter_id,
-            "sw_version": "Tariff " + self.mode,
+            "sw_version": "Tariff " + self.tariff,
             "via_device": None,
         }
 
@@ -444,4 +451,4 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
     @property
     def unique_id(self):
         """Return a unique ID."""
-        return f"tauron-{self.meter_id}-{self.mode.lower()}-{self.sensor_type.lower()}"
+        return f"tauron-{self.meter_id}-{self.sensor_type.lower()}"

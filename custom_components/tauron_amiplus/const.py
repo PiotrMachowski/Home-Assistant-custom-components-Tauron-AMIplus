@@ -2,10 +2,11 @@
 from datetime import timedelta
 
 DOMAIN = "tauron_amiplus"
-DEFAULT_NAME = "Tauron AmiPlus"
+DEFAULT_NAME = "Tauron AMIplus"
 DATA_TAURON_CLIENT = "data_client"
 CONF_METER_ID = "energy_meter_id"
 CONF_GENERATION = "generation"
+CONF_TARIFF = "tariff"
 CONF_SHOW_GENERATION = "show_generation_sensors"
 CONF_URL_SERVICE = "https://elicznik.tauron-dystrybucja.pl"
 CONF_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"
@@ -21,8 +22,9 @@ TYPE_GENERATION_MONTHLY = "generation_monthly"
 TYPE_GENERATION_YEARLY = "generation_yearly"
 ZONE = "zone"
 TARIFF_G12 = "G12"
+SUPPORTED_TARIFFS = [TARIFF_G12]
 SENSOR_TYPES = {
-    TYPE_ZONE: [timedelta(hours=1), "kWh", "sum", ("generation", "OZEValue"), "Zone"],
+    TYPE_ZONE: [timedelta(hours=1), None, "sum", ("generation", "OZEValue"), "Zone"],
     TYPE_CONSUMPTION_DAILY: [
         timedelta(hours=1),
         "kWh",
