@@ -116,13 +116,10 @@ class TauronAmiplusSensor(Entity):
         )
         self.sensor_type = sensor_type
         self.unit = SENSOR_TYPES[sensor_type][1]
-        configuration = TauronAmiplusSensor.calculate_configuration(username, password, meter_id)
-        self.power_zones = configuration[0]
-        self.tariff = configuration[1]
-        self.power_zones_last_update = configuration[2]
-        self.power_zones_last_update_tech = (
-                datetime.datetime.now() - datetime.timedelta(days=1)
-        )
+        self.power_zones = None
+        self.tariff = None
+        self.power_zones_last_update = None
+        self.power_zones_last_update_tech = datetime.datetime(2000, 1, 1)
         self.data = None
         self.params = {}
         self._state = None

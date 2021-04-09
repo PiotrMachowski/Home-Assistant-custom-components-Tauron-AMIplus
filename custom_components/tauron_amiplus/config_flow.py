@@ -46,21 +46,19 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 # Test the connection
-                test = TauronAmiplusConfigFlowSensor(
-                    "Tauron AMIPlus",
-                    user_input[CONF_USERNAME],
-                    user_input[CONF_PASSWORD],
-                    user_input[CONF_METER_ID],
-                    False,
-                    ZONE,
-                )
-                _LOGGER.info("TAURON " + str(test.tariff))
-                if test.tariff is not None:
-                    data = {**user_input, CONF_TARIFF: test.tariff}
+                tariff = None
+                calculated = await self.hass.async_add_executor_job(
+                    TauronAmiplusConfigFlowSensor.calculate_configuration, user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD], user_input[CONF_METER_ID])
+                if calculated is not None:
+                    tariff = calculated[1]
+                _LOGGER.info("TAURON " + str(tariff))
+                if tariff is not None:
+                    data = {**user_input, CONF_TARIFF: tariff}
                     """Finish config flow"""
                     return self.async_create_entry(title=f"eLicznik {user_input[CONF_METER_ID]}", data=data)
                 errors = {CONF_METER_ID: "server_no_connection"}
-                description_placeholders = {"error_info": str(test)}
+                description_placeholders = {"error_info": str(calculated)}
             except Exception as e:
                 errors = {CONF_METER_ID: "server_no_connection"}
                 description_placeholders = {"error_info": str(e)}
