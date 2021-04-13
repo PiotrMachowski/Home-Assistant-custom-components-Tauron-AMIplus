@@ -240,12 +240,10 @@ class TauronAmiplusSensor(Entity):
 
     def update_configuration(self):
         now_datetime = datetime.datetime.now()
-        if (
-                now_datetime - datetime.timedelta(days=1)
-        ) >= self.power_zones_last_update_tech and now_datetime.hour >= 10:
-            config = TauronAmiplusSensor.calculate_configuration(
-                self.username, self.password, self.meter_id, 1
-            )
+        if (now_datetime - datetime.timedelta(days=1)) >= self.power_zones_last_update_tech:
+            days_before = 1 if now_datetime.hour >= 10 else 2
+            config = TauronAmiplusSensor.calculate_configuration(self.username, self.password, self.meter_id,
+                                                                 days_before)
             self.power_zones = config[0]
             self.tariff = config[1]
             self.power_zones_last_update = config[2]
@@ -437,7 +435,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "name": f"eLicznik {self.meter_id}",
             "manufacturer": "TAURON",
             "model": self.meter_id,
-            "sw_version": "Tariff " + self.tariff,
+            "sw_version": f"Tariff {self.tariff}",
             "via_device": None,
         }
 
