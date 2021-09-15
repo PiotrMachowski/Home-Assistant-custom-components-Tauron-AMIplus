@@ -8,10 +8,9 @@ from requests import adapters
 from urllib3 import poolmanager
 import voluptuous as vol
 
-from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
+from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, DEVICE_CLASS_ENERGY
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
 
 from .const import (
@@ -98,7 +97,7 @@ class TLSAdapter(adapters.HTTPAdapter):
         )
 
 
-class TauronAmiplusSensor(Entity):
+class TauronAmiplusSensor(SensorEntity):
     url_login = "https://logowanie.tauron-dystrybucja.pl/login"
     url_charts = "https://elicznik.tauron-dystrybucja.pl/index/charts"
     headers = {
@@ -204,6 +203,14 @@ class TauronAmiplusSensor(Entity):
     @property
     def icon(self):
         return "mdi:counter"
+
+    @property
+    def state_class(self):
+        return "total_increasing" # so far no const available in homeassistant.components.sensor
+
+    @property
+    def device_class(self):
+        return DEVICE_CLASS_ENERGY
 
     def _update(self):
         self.update_configuration()
@@ -447,3 +454,4 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
     def unique_id(self):
         """Return a unique ID."""
         return f"tauron-{self.meter_id}-{self.sensor_type.lower()}"
+
