@@ -208,8 +208,10 @@ class TauronAmiplusSensor(SensorEntity):
     def state_class(self):
         if self.sensor_type.endswith("daily"):
             return STATE_CLASS_MEASUREMENT
-        else:
+        else if self.sensor_type.endswith(("monthly", "yearly")):
             return "total_increasing" # so far no const available in homeassistant core
+        else:
+            return None
 
     @property
     def device_class(self):
@@ -457,4 +459,3 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
     def unique_id(self):
         """Return a unique ID."""
         return f"tauron-{self.meter_id}-{self.sensor_type.lower()}"
-
