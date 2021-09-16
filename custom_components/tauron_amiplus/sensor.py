@@ -8,7 +8,7 @@ from requests import adapters
 from urllib3 import poolmanager
 import voluptuous as vol
 
-from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
+from homeassistant.components.sensor import PLATFORM_SCHEMA, STATE_CLASS_MEASUREMENT, SensorEntity
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, DEVICE_CLASS_ENERGY
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import Throttle
@@ -206,7 +206,10 @@ class TauronAmiplusSensor(SensorEntity):
 
     @property
     def state_class(self):
-        return "total_increasing" # so far no const available in homeassistant.components.sensor
+        if self.sensor_type.endswith("daily"):
+            return STATE_CLASS_MEASUREMENT
+        else:
+            return "total_increasing" # so far no const available in homeassistant core
 
     @property
     def device_class(self):
