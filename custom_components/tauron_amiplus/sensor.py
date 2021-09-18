@@ -208,7 +208,7 @@ class TauronAmiplusSensor(SensorEntity):
     def state_class(self):
         if self.sensor_type.endswith("daily"):
             return STATE_CLASS_MEASUREMENT
-        else if self.sensor_type.endswith(("monthly", "yearly")):
+        elif self.sensor_type.endswith(("monthly", "yearly")):
             return "total_increasing" # so far no const available in homeassistant core
         else:
             return None
