@@ -2,9 +2,11 @@
   "domain": "tauron_amiplus",
   "name": "Tauron AMIplus",
   "documentation": "https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus",
+  "issue_tracker": "https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/issues",
   "dependencies": [],
   "codeowners": ["@PiotrMachowski"],
   "requirements": ["requests"],
-  "version": "v2.0.3",
-  "config_flow": true
+  "version": "v2.0.4",
+  "config_flow": true,
+  "iot_class": "cloud_polling"
 }
