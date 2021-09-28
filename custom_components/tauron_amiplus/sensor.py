@@ -149,6 +149,8 @@ class TauronAmiplusSensor(SensorEntity):
             data=payload_login,
             headers=TauronAmiplusSensor.headers,
         )
+        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": meter_id},  headers=TauronAmiplusSensor.headers) #Switch to specific meter id
+
         config_date = datetime.datetime.now() - datetime.timedelta(days_before)
         payload = {
             "dane[chartDay]": config_date.strftime("%d.%m.%Y"),
@@ -248,6 +250,7 @@ class TauronAmiplusSensor(SensorEntity):
             data=payload_login,
             headers=TauronAmiplusSensor.headers,
         )
+        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": self.meter_id},  headers=TauronAmiplusSensor.headers) #Switch to specific meter id
         return session
 
     def update_configuration(self):
@@ -302,6 +305,7 @@ class TauronAmiplusSensor(SensorEntity):
 
     def update_values_daily(self):
         session = self.get_session()
+        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": self.meter_id},  headers=TauronAmiplusSensor.headers) #Switch to specific meter id
         payload = {
             "dane[chartDay]": (
                     datetime.datetime.now() - datetime.timedelta(1)
@@ -362,6 +366,7 @@ class TauronAmiplusSensor(SensorEntity):
 
     def update_values_monthly(self):
         session = self.get_session()
+        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": self.meter_id},  headers=TauronAmiplusSensor.headers) #Switch to specific meter id
         payload = {
             "dane[chartMonth]": datetime.datetime.now().month,
             "dane[chartYear]": datetime.datetime.now().year,
@@ -396,6 +401,7 @@ class TauronAmiplusSensor(SensorEntity):
 
     def update_values_yearly(self):
         session = self.get_session()
+        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": self.meter_id},  headers=TauronAmiplusSensor.headers) #Switch to specific meter id
         payload = {
             "dane[chartYear]": datetime.datetime.now().year,
             "dane[paramType]": "year",
