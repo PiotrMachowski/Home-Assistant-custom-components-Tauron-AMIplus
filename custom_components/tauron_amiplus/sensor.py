@@ -17,6 +17,9 @@ from .const import (
     CONF_GENERATION, CONF_METER_ID,
     CONF_SHOW_GENERATION,
     CONF_TARIFF,
+    CONF_URL_SERVICE,
+    CONF_URL_LOGIN,
+    CONF_URL_CHARTS,
     DEFAULT_NAME,
     DOMAIN,
     SENSOR_TYPES,
@@ -98,8 +101,8 @@ class TLSAdapter(adapters.HTTPAdapter):
 
 
 class TauronAmiplusSensor(SensorEntity):
-    url_login = "https://logowanie.tauron-dystrybucja.pl/login"
-    url_charts = "https://elicznik.tauron-dystrybucja.pl/index/charts"
+    url_login = CONF_URL_LOGIN
+    url_charts = CONF_URL_CHARTS
     headers = {
         "cache-control": "no-cache",
     }
@@ -133,7 +136,7 @@ class TauronAmiplusSensor(SensorEntity):
         payload_login = {
             "username": username,
             "password": password,
-            "service": "https://elicznik.tauron-dystrybucja.pl",
+            "service": CONF_URL_SERVICE,
         }
         session = requests.session()
         session.mount("https://", TLSAdapter())
@@ -232,7 +235,7 @@ class TauronAmiplusSensor(SensorEntity):
         payload_login = {
             "username": self.username,
             "password": self.password,
-            "service": "https://elicznik.tauron-dystrybucja.pl",
+            "service": CONF_URL_SERVICE,
         }
         session = requests.session()
         session.mount("https://", TLSAdapter())
@@ -449,6 +452,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "model": self.meter_id,
             "sw_version": f"Tariff {self.tariff}",
             "via_device": None,
+            "configuration_url": CONF_URL_SERVICE,
         }
 
     @property
