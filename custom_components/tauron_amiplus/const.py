@@ -26,14 +26,14 @@ SUPPORTED_TARIFFS = [TARIFF_G12]
 SENSOR_TYPES = {
     TYPE_ZONE: [timedelta(hours=1), None, "sum", ("generation", "OZEValue"), "Zone"],
     TYPE_CONSUMPTION_DAILY: [
-        timedelta(hours=1),
+        timedelta(hours=24),
         "kWh",
         "sum",
         ("generation", "OZEValue"),
         "Daily energy consumption",
     ],
     TYPE_CONSUMPTION_MONTHLY: [
-        timedelta(hours=24),
+        timedelta(hours=1),
         "kWh",
         "sum",
         ("generation", "OZEValue"),
@@ -47,7 +47,7 @@ SENSOR_TYPES = {
         "Yearly energy consumption",
     ],
     TYPE_GENERATION_DAILY: [
-        timedelta(hours=6),
+        timedelta(hours=24),
         "kWh",
         "OZEValue",
         ("consumption", "sum"),
