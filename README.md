@@ -71,7 +71,7 @@ sensor:
  
 ### Manual
 
-Download [*tauron_amiplus.zip*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases/latest/download/tauron_amiplus.zip) extract its contents to `config/custom_components/tauron_amiplus` directory:
+Download [*tauron_amiplus.zip*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases/latest/download/tauron_amiplus.zip) and extract its contents to `config/custom_components/tauron_amiplus` directory:
 ```bash
 mkdir -p custom_components/tauron_amiplus
 cd custom_components/tauron_amiplus
