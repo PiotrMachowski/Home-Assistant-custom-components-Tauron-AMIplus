@@ -1,0 +1,182 @@
+"""Update coordinator for TAURON sensors."""
+import datetime
+import logging
+import ssl
+
+import requests
+from requests import adapters
+from urllib3 import poolmanager
+
+from .const import (CONF_URL_CHARTS, CONF_URL_LOGIN,CONF_URL_SERVICE)
+
+
+_LOGGER = logging.getLogger(__name__)
+
+# to fix the SSLError
+class TLSAdapter(adapters.HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        """Create and initialize the urllib3 PoolManager."""
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+        ctx.check_hostname = False
+        self.poolmanager = poolmanager.PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            ssl_version=ssl.PROTOCOL_TLS,
+            ssl_context=ctx,
+        )
+
+class TauronAmiplusRawData:
+    def __init__(self):
+        self.configuration_1_day_ago = None
+        self.configuration_2_days_ago = None
+        self.json_daily = None
+        self.json_monthly = None
+        self.json_yearly = None
+
+
+class TauronAmiplusConnector:
+    url_login = CONF_URL_LOGIN
+    url_charts = CONF_URL_CHARTS
+    headers = {
+        "cache-control": "no-cache",
+    }
+    payload_charts = {"dane[cache]": 0, "dane[chartType]": 2}
+
+    def __init__(self, username, password, meter_id, generation):
+        self.username = username
+        self.password = password
+        self.meter_id = meter_id
+        self.generation_enabled = generation
+
+    def get_raw_data(self) -> TauronAmiplusRawData:
+        data = TauronAmiplusRawData()
+        session = self.get_session()
+        data.configuration_1_day_ago = self.calculate_configuration(session, 1)
+        data.configuration_2_days_ago = self.calculate_configuration(session, 2)
+        data.json_daily = self.get_values_daily(session)
+        data.json_monthly = self.get_values_monthly(session)
+        data.json_yearly = self.get_values_yearly(session)
+        return data
+
+    def get_session(self):
+        payload_login = {
+            "username": self.username,
+            "password": self.password,
+            "service": CONF_URL_SERVICE,
+        }
+        session = requests.session()
+        session.mount("https://", TLSAdapter())
+        session.request(
+            "POST",
+            TauronAmiplusConnector.url_login,
+            data=payload_login,
+            headers=TauronAmiplusConnector.headers,
+        )
+        login_request = session.request(
+            "POST",
+            TauronAmiplusConnector.url_login,
+            data=payload_login,
+            headers=TauronAmiplusConnector.headers,
+        )
+        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": self.meter_id},
+                        headers=TauronAmiplusConnector.headers)
+        return session
+
+    def calculate_configuration(self, session, days_before=2):
+        json_data = self.get_raw_values_daily(session, days_before)
+        if json_data is None:
+            raise Exception("Failed to login")
+        zones = json_data["dane"]["zone"]
+        parsed_zones = []
+        for zone_id in zones:
+            zone = zones[zone_id]
+            start_hour = int(zone["start"][11:])
+            stop_hour = int(zone["stop"][11:])
+            if stop_hour == 24:
+                stop_hour = 0
+            parsed_zones.append({"start": datetime.time(hour=start_hour), "stop": datetime.time(hour=stop_hour)})
+        calculated_zones = []
+        for i in range(0, len(parsed_zones)):
+            next_i = (i + 1) % len(parsed_zones)
+            start = datetime.time(parsed_zones[i]["stop"].hour)
+            stop = datetime.time(parsed_zones[next_i]["start"].hour)
+            calculated_zones.append({"start": start, "stop": stop})
+        power_zones = {1: parsed_zones, 2: calculated_zones}
+        tariff = list(json_data["dane"]["chart"].values())[0]["Taryfa"]
+        config_date = datetime.datetime.now() - datetime.timedelta(days_before)
+        return power_zones, tariff, config_date.strftime("%d.%m.%Y, %H:%M")
+
+    def get_values_yearly(self, session):
+        payload = {
+            "dane[chartYear]": datetime.datetime.now().year,
+            "dane[paramType]": "year",
+            "dane[smartNr]": self.meter_id,
+            "dane[chartType]": 2,
+            "dane[checkOZE]": "on" if self.generation_enabled else "off",
+        }
+        response = session.request(
+            "POST",
+            TauronAmiplusConnector.url_charts,
+            data={**TauronAmiplusConnector.payload_charts, **payload},
+            headers=TauronAmiplusConnector.headers,
+        )
+        if response.status_code == 200 and response.text.startswith('{"name"'):
+            json_data = response.json()
+            return json_data
+        return None
+
+    def get_values_monthly(self, session):
+        payload = {
+            "dane[chartMonth]": datetime.datetime.now().month,
+            "dane[chartYear]": datetime.datetime.now().year,
+            "dane[paramType]": "month",
+            "dane[smartNr]": self.meter_id,
+            "dane[checkOZE]": "on" if self.generation_enabled else "off",
+        }
+        response = session.request(
+            "POST",
+            TauronAmiplusConnector.url_charts,
+            data={**TauronAmiplusConnector.payload_charts, **payload},
+            headers=TauronAmiplusConnector.headers,
+        )
+        if response.status_code == 200 and response.text.startswith('{"name"'):
+            json_data = response.json()
+            return json_data
+        return None
+
+    def get_values_daily(self, session):
+        data = self.get_raw_values_daily(session, 1)
+        if data is None or not data["isFull"]:
+            data = self.get_raw_values_daily(session, 2)
+        return data
+
+    def get_raw_values_daily(self, session, days_before):
+        payload = {
+            "dane[chartDay]": (
+                    datetime.datetime.now() - datetime.timedelta(days_before)
+            ).strftime("%d.%m.%Y"),
+            "dane[paramType]": "day",
+            "dane[smartNr]": self.meter_id,
+            "dane[checkOZE]": "on" if self.generation_enabled else "off",
+        }
+        response = session.request(
+            "POST",
+            TauronAmiplusConnector.url_charts,
+            data={**TauronAmiplusConnector.payload_charts, **payload},
+            headers=TauronAmiplusConnector.headers,
+        )
+        if response.status_code == 200 and response.text.startswith('{"name"'):
+            json_data = response.json()
+            return json_data
+        return None
+
+    @staticmethod
+    def calculate_tariff(username, password, meter_id):
+        coordinator = TauronAmiplusConnector(username, password, meter_id, False)
+        session = coordinator.get_session()
+        config = coordinator.calculate_configuration(session, 2)
+        if config is not None:
+            return config[1]
+        raise Exception("Failed to login")
