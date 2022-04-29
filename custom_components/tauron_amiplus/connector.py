@@ -7,7 +7,7 @@ import requests
 from requests import adapters
 from urllib3 import poolmanager
 
-from .const import (CONF_URL_CHARTS, CONF_URL_LOGIN,CONF_URL_SERVICE)
+from .const import (CONF_URL_CHARTS, CONF_URL_LOGIN, CONF_URL_SERVICE)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,8 +80,7 @@ class TauronAmiplusConnector:
             data=payload_login,
             headers=TauronAmiplusConnector.headers,
         )
-        session.request("POST", "https://elicznik.tauron-dystrybucja.pl/", data={"smart": self.meter_id},
-                        headers=TauronAmiplusConnector.headers)
+        session.request("POST", CONF_URL_SERVICE, data={"smart": self.meter_id}, headers=TauronAmiplusConnector.headers)
         return session
 
     def calculate_configuration(self, session, days_before=2):
@@ -91,6 +90,10 @@ class TauronAmiplusConnector:
         zones = json_data["dane"]["zone"]
         parsed_zones = []
         for zone_id in zones:
+            if type(zone_id) is dict:
+                zone = zone_id
+            else:
+                zone = zones[zone_id]
             zone = zones[zone_id]
             start_hour = int(zone["start"][11:])
             stop_hour = int(zone["stop"][11:])
