@@ -94,7 +94,6 @@ class TauronAmiplusConnector:
                 zone = zone_id
             else:
                 zone = zones[zone_id]
-            zone = zones[zone_id]
             start_hour = int(zone["start"][11:])
             stop_hour = int(zone["stop"][11:])
             if stop_hour == 24:
