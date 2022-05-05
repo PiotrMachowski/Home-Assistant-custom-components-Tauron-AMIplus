@@ -12,6 +12,7 @@ from .const import (CONF_URL_CHARTS, CONF_URL_LOGIN, CONF_URL_SERVICE)
 
 _LOGGER = logging.getLogger(__name__)
 
+
 # to fix the SSLError
 class TLSAdapter(adapters.HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False):
@@ -26,6 +27,7 @@ class TLSAdapter(adapters.HTTPAdapter):
             ssl_version=ssl.PROTOCOL_TLS,
             ssl_context=ctx,
         )
+
 
 class TauronAmiplusRawData:
     def __init__(self):
@@ -116,18 +118,8 @@ class TauronAmiplusConnector:
             "dane[paramType]": "year",
             "dane[smartNr]": self.meter_id,
             "dane[chartType]": 2,
-            "dane[checkOZE]": "on" if self.generation_enabled else "off",
         }
-        response = session.request(
-            "POST",
-            TauronAmiplusConnector.url_charts,
-            data={**TauronAmiplusConnector.payload_charts, **payload},
-            headers=TauronAmiplusConnector.headers,
-        )
-        if response.status_code == 200 and response.text.startswith('{"name"'):
-            json_data = response.json()
-            return json_data
-        return None
+        return self.get_chart_values(session, payload)
 
     def get_values_monthly(self, session):
         payload = {
@@ -135,18 +127,8 @@ class TauronAmiplusConnector:
             "dane[chartYear]": datetime.datetime.now().year,
             "dane[paramType]": "month",
             "dane[smartNr]": self.meter_id,
-            "dane[checkOZE]": "on" if self.generation_enabled else "off",
         }
-        response = session.request(
-            "POST",
-            TauronAmiplusConnector.url_charts,
-            data={**TauronAmiplusConnector.payload_charts, **payload},
-            headers=TauronAmiplusConnector.headers,
-        )
-        if response.status_code == 200 and response.text.startswith('{"name"'):
-            json_data = response.json()
-            return json_data
-        return None
+        return self.get_chart_values(session, payload)
 
     def get_values_daily(self, session):
         data = self.get_raw_values_daily(session, 1)
@@ -161,8 +143,12 @@ class TauronAmiplusConnector:
             ).strftime("%d.%m.%Y"),
             "dane[paramType]": "day",
             "dane[smartNr]": self.meter_id,
-            "dane[checkOZE]": "on" if self.generation_enabled else "off",
         }
+        return self.get_chart_values(session, payload)
+
+    def get_chart_values(self, session, payload):
+        if self.generation_enabled:
+            payload["dane[checkOZE]"] = "on"
         response = session.request(
             "POST",
             TauronAmiplusConnector.url_charts,
