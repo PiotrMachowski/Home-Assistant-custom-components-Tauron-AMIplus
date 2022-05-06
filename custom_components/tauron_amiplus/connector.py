@@ -55,8 +55,8 @@ class TauronAmiplusConnector:
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
         session = self.get_session()
-        data.configuration_1_day_ago = self.calculate_configuration(session, 1)
-        data.configuration_2_days_ago = self.calculate_configuration(session, 2)
+        data.configuration_1_day_ago = self.calculate_configuration(session, 1, False)
+        data.configuration_2_days_ago = self.calculate_configuration(session, 2, False)
         data.json_daily = self.get_values_daily(session)
         data.json_monthly = self.get_values_monthly(session)
         data.json_yearly = self.get_values_yearly(session)
@@ -76,7 +76,7 @@ class TauronAmiplusConnector:
             data=payload_login,
             headers=TauronAmiplusConnector.headers,
         )
-        login_request = session.request(
+        session.request(
             "POST",
             TauronAmiplusConnector.url_login,
             data=payload_login,
@@ -85,10 +85,13 @@ class TauronAmiplusConnector:
         session.request("POST", CONF_URL_SERVICE, data={"smart": self.meter_id}, headers=TauronAmiplusConnector.headers)
         return session
 
-    def calculate_configuration(self, session, days_before=2):
+    def calculate_configuration(self, session, days_before=2, throw_on_empty=True):
         json_data = self.get_raw_values_daily(session, days_before)
         if json_data is None:
-            raise Exception("Failed to login")
+            if throw_on_empty:
+                raise Exception("Failed to login")
+            else:
+                return None
         zones = json_data["dane"]["zone"]
         parsed_zones = []
         for zone_id in zones:
