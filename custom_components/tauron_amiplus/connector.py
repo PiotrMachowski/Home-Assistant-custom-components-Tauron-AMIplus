@@ -7,7 +7,7 @@ import requests
 from requests import adapters
 from urllib3 import poolmanager
 
-from .const import (CONF_URL_CHARTS, CONF_URL_LOGIN, CONF_URL_SERVICE)
+from .const import CONF_URL_CHARTS, CONF_URL_LOGIN, CONF_URL_SERVICE
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class TLSAdapter(adapters.HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False):
         """Create and initialize the urllib3 PoolManager."""
         ctx = ssl.create_default_context()
-        ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+        # ctx.set_ciphers("DEFAULT@SECLEVEL=1")
         ctx.check_hostname = False
         self.poolmanager = poolmanager.PoolManager(
             num_pools=connections,
@@ -82,7 +82,12 @@ class TauronAmiplusConnector:
             data=payload_login,
             headers=TauronAmiplusConnector.headers,
         )
-        session.request("POST", CONF_URL_SERVICE, data={"smart": self.meter_id}, headers=TauronAmiplusConnector.headers)
+        session.request(
+            "POST",
+            CONF_URL_SERVICE,
+            data={"smart": self.meter_id},
+            headers=TauronAmiplusConnector.headers,
+        )
         return session
 
     def calculate_configuration(self, session, days_before=2, throw_on_empty=True):
@@ -103,7 +108,12 @@ class TauronAmiplusConnector:
             stop_hour = int(zone["stop"][11:])
             if stop_hour == 24:
                 stop_hour = 0
-            parsed_zones.append({"start": datetime.time(hour=start_hour), "stop": datetime.time(hour=stop_hour)})
+            parsed_zones.append(
+                {
+                    "start": datetime.time(hour=start_hour),
+                    "stop": datetime.time(hour=stop_hour),
+                }
+            )
         calculated_zones = []
         for i in range(0, len(parsed_zones)):
             next_i = (i + 1) % len(parsed_zones)
@@ -142,7 +152,7 @@ class TauronAmiplusConnector:
     def get_raw_values_daily(self, session, days_before):
         payload = {
             "dane[chartDay]": (
-                    datetime.datetime.now() - datetime.timedelta(days_before)
+                datetime.datetime.now() - datetime.timedelta(days_before)
             ).strftime("%d.%m.%Y"),
             "dane[paramType]": "day",
             "dane[smartNr]": self.meter_id,
