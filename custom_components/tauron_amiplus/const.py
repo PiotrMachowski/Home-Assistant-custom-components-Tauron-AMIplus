@@ -11,9 +11,11 @@ CONF_SHOW_GENERATION = "show_generation_sensors"
 CONF_URL_SERVICE = "https://elicznik.tauron-dystrybucja.pl"
 CONF_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"
 CONF_URL_CHARTS = "https://elicznik.tauron-dystrybucja.pl/index/charts"
+CONF_URL_READINGS = "https://elicznik.tauron-dystrybucja.pl/readings/getread"
 CONF_REQUEST_HEADERS = {"cache-control": "no-cache"}
 CONF_REQUEST_PAYLOAD_CHARTS = {"dane[cache]": 0}
 TYPE_ZONE = "zone"
+TYPE_CONSUMPTION_TOTAL = "consumption_total"
 TYPE_CONSUMPTION_DAILY = "consumption_daily"
 TYPE_CONSUMPTION_MONTHLY = "consumption_monthly"
 TYPE_CONSUMPTION_YEARLY = "consumption_yearly"
@@ -26,6 +28,12 @@ SUPPORTED_TARIFFS = [TARIFF_G12]
 DEFAULT_UPDATE_INTERVAL = timedelta(hours=12)
 SENSOR_TYPES = {
     TYPE_ZONE: [None, "sum", ("generation", "OZEValue"), "Zone"],
+    TYPE_CONSUMPTION_TOTAL: [
+        "kWh",
+        None,
+        (None, None),
+        "Total energy consumption",
+    ],
     TYPE_CONSUMPTION_DAILY: [
         "kWh",
         "sum",
