@@ -135,7 +135,7 @@ class TauronAmiplusConnector:
 
         if response.status_code == 200:
             scraper = TotalMeterValueHTMLScraper(response.text)
-            if scraper.total
+            if scraper.total:
                 return {
                     "value": scraper.total,
                     "unit": scraper.unit,
