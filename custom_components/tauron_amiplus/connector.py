@@ -119,31 +119,34 @@ class TauronAmiplusConnector:
         return power_zones, tariff, config_date.strftime("%d.%m.%Y, %H:%M")
 
     def get_total_consumption(self, session):
-        yesterday = datetime.date.today() - datetime.timedelta(days = 1)
+        today = datetime.date.today()
 
-        response = session.request(
-            "POST",
-            TauronAmiplusConnector.url_readings,
-            data = {
-                "day": yesterday.strftime("%d.%m.%Y")
-            },
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                **TauronAmiplusConnector.headers
-            }
-        )
+        # the value from yesterday may be unavailable yet, so try for the last two days
+        for daysBefore in range(1, 3):
+            timestamp = today - datetime.timedelta(days = daysBefore)
 
-        if response.status_code == 200:
-            scraper = TotalMeterValueHTMLScraper()
-            scraper.feed(response.text)
-
-            if scraper.total:
-                return {
-                    "value": scraper.total,
-                    "unit": scraper.unit,
-                    "timestamp": scraper.timestamp,
-                    "meter_id": scraper.meter_id
+            response = session.request(
+                "POST",
+                TauronAmiplusConnector.url_readings,
+                data = {
+                    "day": timestamp.strftime("%d.%m.%Y")
+                },
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    **TauronAmiplusConnector.headers
                 }
+            )
+
+            if response.status_code == 200:
+                scraper = TotalMeterValueHTMLScraper()
+                scraper.feed(response.text)
+                if scraper.total:
+                    return {
+                        "value": scraper.total,
+                        "unit": scraper.unit,
+                        "timestamp": scraper.timestamp,
+                        "meter_id": scraper.meter_id
+                    }
         return None
 
     def get_values_yearly(self, session):
