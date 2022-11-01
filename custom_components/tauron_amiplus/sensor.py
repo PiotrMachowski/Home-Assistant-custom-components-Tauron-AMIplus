@@ -208,8 +208,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
     def update_total_consumption(self, data):
         self._state = data["value"]
         self.params = {
-            "timestamp": data["timestamp"]
-            "unit": data["unit"]
+            "timestamp": data["timestamp"],
+            "unit": data["unit"],
             "meter_id": data["meter_id"]
         }
 
