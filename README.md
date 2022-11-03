@@ -32,15 +32,16 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 
 ### Possible monitored conditions
 
-| Key | Description |
-| --- | --- | 
-| `zone` | Current zone |
-| `consumption_daily` | Daily energy consumption **(for previous day!)** |
-| `consumption_monthly` | Monthly energy consumption |
-| `consumption_yearly` | Yearly energy consumption |
-| `generation_daily` | Daily energy generation **(for previous day!)** |
-| `generation_monthly` | Monthly energy generation |
-| `generation_yearly` | Yearly energy generation |
+| Key                   | Description                                      |
+|-----------------------|--------------------------------------------------| 
+| `zone`                | Current zone                                     |
+| `consumption_total`   | Total energy consumption **(for previous day!)** |
+| `consumption_daily`   | Daily energy consumption **(for previous day!)** |
+| `consumption_monthly` | Monthly energy consumption                       |
+| `consumption_yearly`  | Yearly energy consumption                        |
+| `generation_daily`    | Daily energy generation **(for previous day!)**  |
+| `generation_monthly`  | Monthly energy generation                        |
+| `generation_yearly`   | Yearly energy generation                         |
 
 ## Example usage
 
@@ -54,6 +55,7 @@ sensor:
     check_generation: true
     monitored_variables:
       - zone
+      - consumption_total
       - consumption_daily
       - consumption_monthly
       - consumption_yearly
@@ -71,7 +73,7 @@ sensor:
  
 ### Manual
 
-Download [*tauron_amiplus.zip*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases/latest/download/tauron_amiplus.zip) extract its contents to `config/custom_components/tauron_amiplus` directory:
+Download [*tauron_amiplus.zip*](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases/latest/download/tauron_amiplus.zip) and extract its contents to `config/custom_components/tauron_amiplus` directory:
 ```bash
 mkdir -p custom_components/tauron_amiplus
 cd custom_components/tauron_amiplus

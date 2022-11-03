@@ -7,8 +7,8 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
-from .sensor import TauronAmiplusConfigFlowSensor
-from .const import CONF_TARIFF, CONF_METER_ID, CONF_SHOW_GENERATION, DOMAIN, ZONE
+from .const import CONF_TARIFF, CONF_METER_ID, CONF_SHOW_GENERATION, DOMAIN
+from .connector import TauronAmiplusConnector
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,11 +48,10 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 # Test the connection
                 tariff = None
                 calculated = await self.hass.async_add_executor_job(
-                    TauronAmiplusConfigFlowSensor.calculate_configuration, user_input[CONF_USERNAME],
+                    TauronAmiplusConnector.calculate_tariff, user_input[CONF_USERNAME],
                     user_input[CONF_PASSWORD], user_input[CONF_METER_ID])
                 if calculated is not None:
-                    tariff = calculated[1]
-                _LOGGER.info("TAURON " + str(tariff))
+                    tariff = calculated
                 if tariff is not None:
                     data = {**user_input, CONF_TARIFF: tariff}
                     """Finish config flow"""
