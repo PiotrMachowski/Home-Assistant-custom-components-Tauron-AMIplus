@@ -119,7 +119,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
     def state_class(self):
         if self.sensor_type.endswith("daily"):
             return STATE_CLASS_MEASUREMENT
-        elif self.sensor_type.endswith(("monthly", "yearly")):
+        elif self.sensor_type.endswith(("monthly", "yearly", "total")):
             return "total_increasing"  # so far no const available in homeassistant core
         else:
             return None
@@ -147,6 +147,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
                                       self.coordinator.data.configuration_2_days_ago)
         if self.sensor_type == ZONE:
             self.update_zone()
+        elif self.sensor_type.endswith("total") and self.coordinator.data.total_consumption is not None:
+            self.update_total_consumption(self.coordinator.data.total_consumption)
         elif self.sensor_type.endswith("daily") and self.coordinator.data.json_daily is not None:
             self.update_values_daily(self.coordinator.data.json_daily)
         elif self.sensor_type.endswith("monthly") and self.coordinator.data.json_monthly is not None:
@@ -202,6 +204,14 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
                 self.params[pz_name] = pz
         else:
             self._state = 1
+
+    def update_total_consumption(self, data):
+        self._state = data["value"]
+        self.params = {
+            "timestamp": data["timestamp"],
+            "unit": data["unit"],
+            "meter_id": data["meter_id"]
+        }
 
     def update_values_daily(self, json_data):
         self._state = round(float(json_data[self.state_param]), 3)
