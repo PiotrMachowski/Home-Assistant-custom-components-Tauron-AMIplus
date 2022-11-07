@@ -1,13 +1,12 @@
-import re
 import datetime
-
+import re
 from html.parser import HTMLParser
 
 from total_meter_reading import TotalMeterReading
 
 
-class TotalMeterReadingHTMLScraper(HTMLParser):
-    """Parses HTML to extract total meter value, unit, timestamp, and meter ID"""
+class TotalMeterReadingsHTMLParser(HTMLParser):
+    """Parses HTML to extract total meter value, unit, timestamp, and meter ID for both consumption and generation"""
 
     # the expected input for consumption only:           <div class="clear"></div>Pobór:<br /><span class="name"> <b></b> 02.10.2022 (23:59:59)</span> <span original-title="Nr licznika: 12345678" class="value tipsyOnTop"> 000035</span><span class="unit">kWh </span><br />
     # the expected input for consumption and generation: <div class="clear"></div>Pobór:<br /><span class="name"> <b></b> 02.10.2022 (23:59:59)</span> <span original-title="Nr licznika: 12345678" class="value tipsyOnTop"> 000035</span><span class="unit">kWh </span><br /><div class="clear"></div><br />Oddanie:<br /><span class="name"> <b></b> 02.10.2022 (23:59:59)</span> <span original-title="Nr licznika: 12345678" class="value tipsyOnTop"> 021483</span><span class="unit">kWh </span><br />
@@ -33,7 +32,7 @@ class TotalMeterReadingHTMLScraper(HTMLParser):
         self.__is_unit_span: bool = False
         self.__is_timestamp_span: bool = False
 
-        super(TotalMeterReadingHTMLScraper, self).__init__()
+        super(TotalMeterReadingsHTMLParser, self).__init__()
 
     def handle_starttag(self, tag, attrs):
         if tag == "span":
