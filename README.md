@@ -60,6 +60,7 @@ sensor:
       - consumption_daily
       - consumption_monthly
       - consumption_yearly
+      - generation_total
       - generation_daily
       - generation_monthly
       - generation_yearly
