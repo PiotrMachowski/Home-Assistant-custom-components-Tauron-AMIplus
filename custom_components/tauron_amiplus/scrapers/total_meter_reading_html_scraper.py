@@ -20,6 +20,10 @@ class TotalMeterReadingHTMLScraper(HTMLParser):
     def consumption(self) -> TotalMeterReading:
         return self.__consumption
 
+    @property
+    def is_valid(self) -> bool:
+        return self.__consumption is not None or self.__generation is not None
+
     def __init__(self):
         self.__current: TotalMeterReading = None
         self.__generation: TotalMeterReading = None
