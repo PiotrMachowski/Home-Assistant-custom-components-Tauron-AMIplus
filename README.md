@@ -39,6 +39,7 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 | `consumption_daily`   | Daily energy consumption **(for previous day!)** |
 | `consumption_monthly` | Monthly energy consumption                       |
 | `consumption_yearly`  | Yearly energy consumption                        |
+| `generation_total`    | Total energy generation **(for previous day!)** |
 | `generation_daily`    | Daily energy generation **(for previous day!)**  |
 | `generation_monthly`  | Monthly energy generation                        |
 | `generation_yearly`   | Yearly energy generation                         |

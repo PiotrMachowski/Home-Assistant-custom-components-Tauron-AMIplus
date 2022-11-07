@@ -8,7 +8,8 @@ from requests import adapters
 from urllib3 import poolmanager
 
 from .const import (CONF_URL_CHARTS, CONF_URL_READINGS, CONF_URL_LOGIN, CONF_URL_SERVICE)
-from .scrapers.total_meter_value_html_scraper import (TotalMeterValueHTMLScraper)
+from .scrapers.itotal_meter_readings import ITotalMeterReadings
+from .scrapers.total_meter_readings_html_parser import TotalMeterReadingsHTMLParser
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class TauronAmiplusRawData:
     def __init__(self):
         self.configuration_1_day_ago = None
         self.configuration_2_days_ago = None
-        self.total_consumption = None
+        self.total_readings: ITotalMeterReadings = None
         self.json_daily = None
         self.json_monthly = None
         self.json_yearly = None
@@ -59,7 +60,7 @@ class TauronAmiplusConnector:
         session = self.get_session()
         data.configuration_1_day_ago = self.calculate_configuration(session, 1, False)
         data.configuration_2_days_ago = self.calculate_configuration(session, 2, False)
-        data.total_consumption = self.get_total_consumption(session)
+        data.total_readings = self.get_total_meter_readings(session)
         data.json_daily = self.get_values_daily(session)
         data.json_monthly = self.get_values_monthly(session)
         data.json_yearly = self.get_values_yearly(session)
@@ -118,35 +119,30 @@ class TauronAmiplusConnector:
         config_date = datetime.datetime.now() - datetime.timedelta(days_before)
         return power_zones, tariff, config_date.strftime("%d.%m.%Y, %H:%M")
 
-    def get_total_consumption(self, session):
+    def get_total_meter_readings(self, session) -> ITotalMeterReadings:
         today = datetime.date.today()
 
-        # the value from yesterday may be unavailable yet, so try for the last two days
+        # the value from yesterday may be unavailable yet, so check the last two days
         for daysBefore in range(1, 3):
-            timestamp = today - datetime.timedelta(days = daysBefore)
+            timestamp = today - datetime.timedelta(days=daysBefore)
 
             response = session.request(
                 "POST",
                 TauronAmiplusConnector.url_readings,
-                data = {
+                data={
                     "day": timestamp.strftime("%d.%m.%Y")
                 },
-                headers = {
+                headers={
                     "Content-Type": "application/x-www-form-urlencoded",
                     **TauronAmiplusConnector.headers
                 }
             )
 
             if response.status_code == 200:
-                scraper = TotalMeterValueHTMLScraper()
+                scraper = TotalMeterReadingsHTMLParser()
                 scraper.feed(response.text)
-                if scraper.total:
-                    return {
-                        "value": scraper.total,
-                        "unit": scraper.unit,
-                        "timestamp": scraper.timestamp,
-                        "meter_id": scraper.meter_id
-                    }
+                if scraper.is_valid:
+                    return scraper
         return None
 
     def get_values_yearly(self, session):

@@ -10,8 +10,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (CONF_GENERATION, CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONF_URL_SERVICE, DEFAULT_NAME,
                     DOMAIN, SENSOR_TYPES, SUPPORTED_TARIFFS,
-                    TARIFF_G12, TYPE_ZONE, ZONE)
+                    TARIFF_G12, TYPE_ZONE, ZONE, TYPE_CONSUMPTION_TOTAL, TYPE_GENERATION_TOTAL)
 from .coordinator import TauronAmiplusRawData, TauronAmiplusUpdateCoordinator
+from .scrapers.total_meter_reading import TotalMeterReading
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             )
 
     async_add_entities(sensors, True)
+
 
 class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData]):
 
@@ -147,8 +149,10 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
                                       self.coordinator.data.configuration_2_days_ago)
         if self.sensor_type == ZONE:
             self.update_zone()
-        elif self.sensor_type.endswith("total") and self.coordinator.data.total_consumption is not None:
-            self.update_total_consumption(self.coordinator.data.total_consumption)
+        elif self.sensor_type == TYPE_CONSUMPTION_TOTAL and self.coordinator.data.total_readings is not None:
+            self.update_total_reading(self.coordinator.data.total_readings.consumption)
+        elif self.sensor_type == TYPE_GENERATION_TOTAL and self.coordinator.data.total_readings is not None:
+            self.update_total_reading(self.coordinator.data.total_readings.generation)
         elif self.sensor_type.endswith("daily") and self.coordinator.data.json_daily is not None:
             self.update_values_daily(self.coordinator.data.json_daily)
         elif self.sensor_type.endswith("monthly") and self.coordinator.data.json_monthly is not None:
@@ -205,12 +209,15 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
         else:
             self._state = 1
 
-    def update_total_consumption(self, data):
-        self._state = data["value"]
+    def update_total_reading(self, data: TotalMeterReading):
+        if data is None:
+            return
+
+        self._state = data.value
         self.params = {
-            "timestamp": data["timestamp"],
-            "unit": data["unit"],
-            "meter_id": data["meter_id"]
+            "timestamp": data.timestamp,
+            "unit": data.unit,
+            "meter_id": data.meter_id
         }
 
     def update_values_daily(self, json_data):
