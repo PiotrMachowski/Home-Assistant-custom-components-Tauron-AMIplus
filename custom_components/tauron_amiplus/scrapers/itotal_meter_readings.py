@@ -1,4 +1,4 @@
-from total_meter_reading import TotalMeterReading
+from .total_meter_reading import TotalMeterReading
 
 
 class ITotalMeterReadings:
