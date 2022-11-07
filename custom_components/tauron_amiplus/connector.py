@@ -8,7 +8,7 @@ from requests import adapters
 from urllib3 import poolmanager
 
 from .const import (CONF_URL_CHARTS, CONF_URL_READINGS, CONF_URL_LOGIN, CONF_URL_SERVICE)
-from .scrapers.total_meter_value_html_scraper import (TotalMeterValueHTMLScraper)
+from .scrapers.total_meter_reading_html_scraper import (TotalMeterReadingHTMLScraper)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ class TauronAmiplusConnector:
             )
 
             if response.status_code == 200:
-                scraper = TotalMeterValueHTMLScraper()
+                scraper = TotalMeterReadingHTMLScraper()
                 scraper.feed(response.text)
                 if scraper.total:
                     return {
