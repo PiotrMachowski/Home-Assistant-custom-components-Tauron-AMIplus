@@ -19,6 +19,7 @@ TYPE_CONSUMPTION_TOTAL = "consumption_total"
 TYPE_CONSUMPTION_DAILY = "consumption_daily"
 TYPE_CONSUMPTION_MONTHLY = "consumption_monthly"
 TYPE_CONSUMPTION_YEARLY = "consumption_yearly"
+TYPE_GENERATION_TOTAL = "generation_total"
 TYPE_GENERATION_DAILY = "generation_daily"
 TYPE_GENERATION_MONTHLY = "generation_monthly"
 TYPE_GENERATION_YEARLY = "generation_yearly"
@@ -51,6 +52,12 @@ SENSOR_TYPES = {
         "sum",
         ("generation", "OZEValue"),
         "Yearly energy consumption",
+    ],
+    TYPE_GENERATION_TOTAL: [
+        "kWh",
+        None,
+        (None, None),
+        "Total energy generation",
     ],
     TYPE_GENERATION_DAILY: [
         "kWh",
