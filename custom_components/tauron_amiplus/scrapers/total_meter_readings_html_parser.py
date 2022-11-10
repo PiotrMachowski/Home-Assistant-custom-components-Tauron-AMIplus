@@ -78,9 +78,9 @@ class TotalMeterReadingsHTMLParser(HTMLParser):
                     self.__is_unit_span = True
 
             if x[0] == "original-title":
-                match = re.search(r"\d+", x[1])
+                match = re.search(r"Nr licznika:\s*(?P<id>.+)", x[1])
                 if match and self.__current is not None:
-                    self.__current.meter_id = int(match[0])
+                    self.__current.meter_id = match.group("id").strip()
 
     def __handle_span_end_tag(self):
         self.__is_value_span = self.__is_timestamp_span = self.__is_unit_span = False
@@ -92,12 +92,12 @@ class TotalMeterReadingsHTMLParser(HTMLParser):
         )
         if match:
             self.__current.timestamp = datetime.datetime(
-                year=int(match.group("year")),
-                month=int(match.group("month")),
-                day=int(match.group("day")),
-                hour=int(match.group("hour")),
-                minute=int(match.group("minute")),
-                second=int(match.group("second"))
+                year = int(match.group("year")),
+                month = int(match.group("month")),
+                day = int(match.group("day")),
+                hour = int(match.group("hour")),
+                minute = int(match.group("minute")),
+                second = int(match.group("second"))
             )
 
     def __read_unit(self, data):
