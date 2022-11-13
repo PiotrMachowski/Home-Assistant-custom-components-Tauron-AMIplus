@@ -214,9 +214,12 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
             return
 
         self._state = data.value
+
+        if data.unit:
+            self.unit = data.unit
+
         self.params = {
             "timestamp": data.timestamp,
-            "unit": data.unit,
             "meter_id": data.meter_id
         }
 
