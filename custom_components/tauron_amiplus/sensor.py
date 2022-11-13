@@ -101,7 +101,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
         return self._state
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         _params = {
             "tariff": self.tariff,
             "zones_updated": self.power_zones_last_update,
