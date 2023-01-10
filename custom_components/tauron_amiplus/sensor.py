@@ -137,7 +137,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
         self.async_write_ha_state()
 
     def update_readings(self, json_data, tariff):
-        reading = json_data["data"][0]
+        reading = json_data["data"][-1]
         self._state = reading["C"]
         partials = {s: reading[s] for s in ["S1", "S2", "S3"] if reading[s] is not None}
         self.params = {"date": reading["Date"], **partials}

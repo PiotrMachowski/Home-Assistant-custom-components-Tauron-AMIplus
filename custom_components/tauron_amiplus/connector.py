@@ -40,6 +40,7 @@ class TauronAmiplusRawData:
 
 
 class TauronAmiplusConnector:
+    date_format = "%d.%m.%Y"
     headers = {
         "cache-control": "no-cache",
     }
@@ -112,8 +113,8 @@ class TauronAmiplusConnector:
         last_day_of_month = first_day_of_month.replace(month=month % 12 + 1) - datetime.timedelta(days=1)
 
         payload = {
-            "from": first_day_of_month.strftime("%d.%m.%Y"),
-            "to": last_day_of_month.strftime("%d.%m.%Y"),
+            "from": first_day_of_month.strftime(self.date_format),
+            "to": last_day_of_month.strftime(self.date_format),
             "profile": "month",
             "type": "consum",
         }
@@ -126,7 +127,7 @@ class TauronAmiplusConnector:
         return data, day
 
     def get_raw_values_daily(self, session, days_before):
-        day = (datetime.datetime.now() - datetime.timedelta(days_before)).strftime("%d.%m.%Y")
+        day = (datetime.datetime.now() - datetime.timedelta(days_before)).strftime(self.date_format)
         payload = {
             "from": day,
             "to": day,
@@ -136,10 +137,12 @@ class TauronAmiplusConnector:
         return TauronAmiplusConnector.get_chart_values(session, payload), day
 
     def get_readings(self, session, days_before=2):
-        day = (datetime.datetime.now() - datetime.timedelta(days_before)).strftime("%d.%m.%Y")
+        date_to = datetime.datetime.now()
+        date_from = (date_to - datetime.timedelta(days_before))
+
         payload = {
-                "from": day,
-                "to": day,
+                "from": date_from.strftime(self.date_format),
+                "to": date_to.strftime(self.date_format),
                 "profile": "month",
                 "type": "energia-pobrana"
             }
