@@ -4,13 +4,12 @@ import logging
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity, STATE_CLASS_MEASUREMENT
-from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, DEVICE_CLASS_ENERGY
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (CONF_GENERATION, CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONF_URL_SERVICE, DEFAULT_NAME,
-                    DOMAIN, SENSOR_TYPES, SUPPORTED_TARIFFS,
-                    TARIFF_G12, TYPE_ZONE, ZONE)
+                    DOMAIN, SENSOR_TYPES, TYPE_CURRENT_READINGS)
 from .coordinator import TauronAmiplusRawData, TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,14 +48,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
     tariff = entry.data[CONF_TARIFF]
     sensors = []
     sensor_types = {**SENSOR_TYPES}
-    if tariff not in SUPPORTED_TARIFFS:
-        sensor_types.pop(TYPE_ZONE)
     generation = show_generation_sensors or any(sensor_type.startswith("generation") for sensor_type in sensor_types)
     coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, generation)
     await coordinator.async_request_refresh()
     for sensor_type in sensor_types:
         if not (sensor_type.startswith("generation") and not show_generation_sensors):
-            sensor_name = SENSOR_TYPES[sensor_type][3]
+            sensor_name = SENSOR_TYPES[sensor_type][0]
             sensors.append(
                 TauronAmiplusConfigFlowSensor(
                     coordinator,
@@ -69,6 +66,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities(sensors, True)
 
+
 class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData]):
 
     def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, generation, sensor_type):
@@ -77,7 +75,6 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
         self.meter_id = meter_id
         self.generation_enabled = generation or sensor_type.startswith("generation")
         self.sensor_type = sensor_type
-        self.unit = SENSOR_TYPES[sensor_type][0]
         self.power_zones = None
         self.tariff = None
         self.power_zones_last_update = None
@@ -85,31 +82,32 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
         self.data = None
         self.params = {}
         self._state = None
-        if not sensor_type == ZONE:
-            self.state_param = SENSOR_TYPES[sensor_type][1]
-            self.additional_param_name = SENSOR_TYPES[sensor_type][2][0]
-            self.additional_param = SENSOR_TYPES[sensor_type][2][1]
 
     @property
     def name(self):
         return f"{self.client_name} {self.sensor_type}"
 
     @property
-    def state(self):
+    def native_unit_of_measurement(self):
+        return ENERGY_KILO_WATT_HOUR
+
+    @property
+    def device_class(self):
+        return SensorDeviceClass.ENERGY
+
+    @property
+    def native_value(self):
+        if self.sensor_type.startswith("generation"):
+            return None  # TODO support generation
         return self._state
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         _params = {
             "tariff": self.tariff,
-            "zones_updated": self.power_zones_last_update,
             **self.params,
         }
         return _params
-
-    @property
-    def unit_of_measurement(self):
-        return self.unit
 
     @property
     def icon(self):
@@ -117,145 +115,45 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
 
     @property
     def state_class(self):
-        if self.sensor_type.endswith("daily"):
-            return STATE_CLASS_MEASUREMENT
+        if self.sensor_type.endswith("daily") or "current" in self.sensor_type:
+            return SensorStateClass.MEASUREMENT
         elif self.sensor_type.endswith(("monthly", "yearly")):
-            return "total_increasing"  # so far no const available in homeassistant core
+            return SensorStateClass.TOTAL_INCREASING
         else:
             return None
-
-    @property
-    def device_class(self):
-        return DEVICE_CLASS_ENERGY
-
-    @property
-    def should_poll(self) -> bool:
-        return self.sensor_type == ZONE
-
-    async def async_update(self) -> None:
-        if self.sensor_type == ZONE:
-            self.update_zone()
-        else:
-            await super().async_update()
 
     def _handle_coordinator_update(self) -> None:
         if self.coordinator.data is None:
             return
-        if self.coordinator.data.configuration_1_day_ago is not None \
-                and self.coordinator.data.configuration_2_days_ago is not None:
-            self.update_configuration(self.coordinator.data.configuration_1_day_ago,
-                                      self.coordinator.data.configuration_2_days_ago)
-        if self.sensor_type == ZONE:
-            self.update_zone()
+        elif self.sensor_type == TYPE_CURRENT_READINGS and self.coordinator.data.json_readings is not None:
+            self.update_readings(self.coordinator.data.json_readings)
         elif self.sensor_type.endswith("daily") and self.coordinator.data.json_daily is not None:
-            self.update_values_daily(self.coordinator.data.json_daily)
+            self.update_values(self.coordinator.data.json_daily)
         elif self.sensor_type.endswith("monthly") and self.coordinator.data.json_monthly is not None:
-            self.update_values_monthly(self.coordinator.data.json_monthly)
+            self.update_values(self.coordinator.data.json_monthly)
         elif self.sensor_type.endswith("yearly") and self.coordinator.data.json_yearly is not None:
-            self.update_values_yearly(self.coordinator.data.json_yearly)
+            self.update_values(self.coordinator.data.json_yearly)
         self.async_write_ha_state()
 
-    def update_configuration(self, config_1_day_ago, config_2_days_ago):
-        now_datetime = datetime.datetime.now()
-        if (now_datetime - datetime.timedelta(days=1)) >= self.power_zones_last_update_tech:
-            config = config_1_day_ago if now_datetime.hour >= 10 else config_2_days_ago
-            self.power_zones = config[0]
-            self.tariff = config[1]
-            self.power_zones_last_update = config[2]
-            self.power_zones_last_update_tech = now_datetime
+    def update_readings(self, json_data):
+        reading = json_data["data"][0]
+        self._state = reading["C"]
+        partials = {s: reading[s] for s in ["S1", "S2", "S3"] if reading[s] is not None}
+        self.params = {"date": reading["Date"], **partials}
+        self.tariff = "taryfa"
 
-    def update_zone(self):
-        if self.tariff == TARIFF_G12:
-            parsed_zones = self.power_zones[1]
-            now_time = datetime.datetime.now().time()
-            if (
-                    len(
-                        list(
-                            filter(
-                                lambda x: x["start"] <= now_time < x["stop"], parsed_zones
-                            )
-                        )
-                    )
-                    > 0
-            ):
-                self._state = 1
-            else:
-                self._state = 2
-            self.params = {}
-            for power_zone in self.power_zones:
-                pz_name = f"zone{power_zone} "
-                pz = (
-                    str(
-                        list(
-                            map(
-                                lambda x: x["start"].strftime("%H:%M")
-                                          + " - "
-                                          + x["stop"].strftime("%H:%M"),
-                                self.power_zones[power_zone],
-                            )
-                        )
-                    )
-                        .replace("[", "")
-                        .replace("]", "")
-                        .replace("'", "")
-                )
-                self.params[pz_name] = pz
-        else:
-            self._state = 1
+    def update_values(self, json_data):
+        total, tariff, zones = TauronAmiplusSensor.get_data_from_json(json_data)
+        self._state = total
+        self.tariff = tariff
+        self.params = zones
 
-    def update_values_daily(self, json_data):
-        self._state = round(float(json_data[self.state_param]), 3)
-        if self.tariff == TARIFF_G12:
-            values = list(json_data["dane"]["chart"].values())
-            z1 = list(filter(lambda x: x["Zone"] == "1", values))
-            z2 = list(filter(lambda x: x["Zone"] == "2", values))
-            sum_z1 = round(sum(float(val["EC"]) for val in z1), 3)
-            sum_z2 = round(sum(float(val["EC"]) for val in z2), 3)
-            day = values[0]["Date"]
-            self.params = {"zone1": sum_z1, "zone2": sum_z2, "day": day}
-        if self.generation_enabled:
-            self.params = {
-                **self.params,
-                self.additional_param_name: round(
-                    float(json_data[self.additional_param]), 3
-                ),
-            }
-
-    def update_values_monthly(self, json_data):
-        self._state = round(float(json_data[self.state_param]), 3)
-        self.params = {}
-        if self.tariff == TARIFF_G12:
-            values = json_data["dane"]["chart"]
-            z1 = list(filter(lambda x: "tariff1" in x, values))
-            z2 = list(filter(lambda x: "tariff2" in x, values))
-            sum_z1 = round(sum(float(val["tariff1"]) for val in z1), 3)
-            sum_z2 = round(sum(float(val["tariff2"]) for val in z2), 3)
-            self.params = {"zone1": sum_z1, "zone2": sum_z2}
-        if self.generation_enabled:
-            self.params = {
-                **self.params,
-                self.additional_param_name: round(
-                    float(json_data[self.additional_param]), 3
-                ),
-            }
-
-    def update_values_yearly(self, json_data):
-        self._state = round(float(json_data[self.state_param]), 3)
-        self.params = {}
-        if self.tariff == TARIFF_G12:
-            values = json_data["dane"]["chart"]
-            z1 = list(filter(lambda x: "tariff1" in x, values))
-            z2 = list(filter(lambda x: "tariff2" in x, values))
-            sum_z1 = round(sum(float(val["tariff1"]) for val in z1), 3)
-            sum_z2 = round(sum(float(val["tariff2"]) for val in z2), 3)
-            self.params = {"zone1": sum_z1, "zone2": sum_z2}
-        if self.generation_enabled:
-            self.params = {
-                **self.params,
-                self.additional_param_name: round(
-                    float(json_data[self.additional_param]), 3
-                ),
-            }
+    @staticmethod
+    def get_data_from_json(json_data):
+        total = round(json_data["data"]["sum"], 3)
+        tariff = json_data["data"]["tariff"]
+        zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
+        return total, tariff, zones
 
     @property
     def unique_id(self):
