@@ -80,6 +80,8 @@ unzip tauron_amiplus.zip
 rm tauron_amiplus.zip
 ```
 
+Then restart Home Assistant before applying configuration file changes.
+
 ## FAQ
 
 * **How to get energy meter id?**
