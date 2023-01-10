@@ -126,21 +126,22 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
         if self.coordinator.data is None:
             return
         elif self.sensor_type == TYPE_CURRENT_READINGS and self.coordinator.data.json_readings is not None:
-            self.update_readings(self.coordinator.data.json_readings)
+            self.update_readings(self.coordinator.data.json_readings, self.coordinator.data.tariff)
         elif self.sensor_type.endswith("daily") and self.coordinator.data.json_daily is not None:
             self.update_values(self.coordinator.data.json_daily)
+            self.params = {"date": self.coordinator.data.daily_date, **self.params}
         elif self.sensor_type.endswith("monthly") and self.coordinator.data.json_monthly is not None:
             self.update_values(self.coordinator.data.json_monthly)
         elif self.sensor_type.endswith("yearly") and self.coordinator.data.json_yearly is not None:
             self.update_values(self.coordinator.data.json_yearly)
         self.async_write_ha_state()
 
-    def update_readings(self, json_data):
+    def update_readings(self, json_data, tariff):
         reading = json_data["data"][0]
         self._state = reading["C"]
         partials = {s: reading[s] for s in ["S1", "S2", "S3"] if reading[s] is not None}
         self.params = {"date": reading["Date"], **partials}
-        self.tariff = "taryfa"
+        self.tariff = tariff
 
     def update_values(self, json_data):
         total, tariff, zones = TauronAmiplusSensor.get_data_from_json(json_data)

@@ -33,8 +33,10 @@ class TauronAmiplusRawData:
     def __init__(self):
         self.json_readings = None
         self.json_daily = None
+        self.daily_date = None
         self.json_monthly = None
         self.json_yearly = None
+        self.tariff = None
 
 
 class TauronAmiplusConnector:
@@ -52,9 +54,10 @@ class TauronAmiplusConnector:
         data = TauronAmiplusRawData()
         session = self.get_session()
         data.json_readings = self.get_readings(session)
-        data.json_daily = self.get_values_daily(session)
+        data.json_daily, data.daily_date = self.get_values_daily(session)
         data.json_monthly = self.get_values_monthly(session)
         data.json_yearly = self.get_values_yearly(session)
+        data.tariff = data.json_yearly["data"]["tariff"]
         return data
 
     def get_session(self):
@@ -83,7 +86,7 @@ class TauronAmiplusConnector:
         return session
 
     def calculate_configuration(self, session, days_before=2, throw_on_empty=True):
-        json_data = self.get_raw_values_daily(session, days_before)
+        json_data, _ = self.get_raw_values_daily(session, days_before)
         if json_data is None:
             if throw_on_empty:
                 raise Exception("Failed to login")
@@ -117,10 +120,10 @@ class TauronAmiplusConnector:
         return TauronAmiplusConnector.get_chart_values(session, payload)
 
     def get_values_daily(self, session):
-        data = self.get_raw_values_daily(session, 1)
+        data, day = self.get_raw_values_daily(session, 1)
         if data is None or len(data["data"]["allData"]) < 24:
-            data = self.get_raw_values_daily(session, 2)
-        return data
+            data, day = self.get_raw_values_daily(session, 2)
+        return data, day
 
     def get_raw_values_daily(self, session, days_before):
         day = (datetime.datetime.now() - datetime.timedelta(days_before)).strftime("%d.%m.%Y")
@@ -130,7 +133,7 @@ class TauronAmiplusConnector:
             "profile": "full time",
             "type": "consum",
         }
-        return TauronAmiplusConnector.get_chart_values(session, payload)
+        return TauronAmiplusConnector.get_chart_values(session, payload), day
 
     def get_readings(self, session, days_before=2):
         day = (datetime.datetime.now() - datetime.timedelta(days_before)).strftime("%d.%m.%Y")
