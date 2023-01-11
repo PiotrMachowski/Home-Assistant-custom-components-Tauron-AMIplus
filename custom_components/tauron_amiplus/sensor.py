@@ -8,7 +8,7 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, 
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (CONF_GENERATION, CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONF_URL_SERVICE, DEFAULT_NAME,
+from .const import (CONF_GENERATION, CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_URL_SERVICE, DEFAULT_NAME,
                     DOMAIN, SENSOR_TYPES, TYPE_CURRENT_READINGS)
 from .coordinator import TauronAmiplusRawData, TauronAmiplusUpdateCoordinator
 
@@ -177,7 +177,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "model": self.meter_id,
             "sw_version": f"Tariff {self.tariff}",
             "via_device": None,
-            "configuration_url": CONF_URL_SERVICE,
+            "configuration_url": CONST_URL_SERVICE,
         }
 
     @property

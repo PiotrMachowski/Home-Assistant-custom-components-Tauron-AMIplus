@@ -7,7 +7,8 @@ import requests
 from requests import adapters
 from urllib3 import poolmanager
 
-from .const import (CONF_URL_ENERGY, CONF_URL_LOGIN, CONF_URL_READINGS, CONF_URL_SERVICE)
+from .const import (CONST_DATE_FORMAT, CONST_MAX_LOOKUP_RANGE, CONST_REQUEST_HEADERS, CONST_URL_ENERGY, CONST_URL_LOGIN,
+                    CONST_URL_READINGS, CONST_URL_SERVICE)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # to fix the SSLError
 class TLSAdapter(adapters.HTTPAdapter):
-    def init_poolmanager(self, connections, maxsize, block=False):
+    def init_poolmanager(self, connections, maxsize, block=False, **kwargs):
         """Create and initialize the urllib3 PoolManager."""
         ctx = ssl.create_default_context()
         ctx.set_ciphers("DEFAULT@SECLEVEL=1")
@@ -40,54 +41,50 @@ class TauronAmiplusRawData:
 
 
 class TauronAmiplusConnector:
-    date_format = "%d.%m.%Y"
-    headers = {
-        "cache-control": "no-cache",
-    }
 
     def __init__(self, username, password, meter_id, generation):
         self.username = username
         self.password = password
         self.meter_id = meter_id
         self.generation_enabled = generation
+        self.session = None
 
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
-        session = self.get_session()
-        data.json_readings = self.get_readings(session)
-        data.json_daily, data.daily_date = self.get_values_daily(session)
-        data.json_monthly = self.get_values_monthly(session)
-        data.json_yearly = self.get_values_yearly(session)
+        self.login()
+        data.json_readings = self.get_readings(CONST_MAX_LOOKUP_RANGE)
+        data.json_daily, data.daily_date = self.get_values_daily()
+        data.json_monthly = self.get_values_monthly()
+        data.json_yearly = self.get_values_yearly()
         data.tariff = data.json_yearly["data"]["tariff"]
         return data
 
-    def get_session(self):
+    def login(self):
         payload_login = {
             "username": self.username,
             "password": self.password,
-            "service": CONF_URL_SERVICE,
+            "service": CONST_URL_SERVICE,
         }
         session = requests.session()
         session.mount("https://", TLSAdapter())
         session.request(
             "POST",
-            CONF_URL_LOGIN,
+            CONST_URL_LOGIN,
             data=payload_login,
-            headers=TauronAmiplusConnector.headers,
+            headers=CONST_REQUEST_HEADERS,
         )
         session.request(
             "POST",
-            CONF_URL_LOGIN,
+            CONST_URL_LOGIN,
             data=payload_login,
-            headers=TauronAmiplusConnector.headers,
+            headers=CONST_REQUEST_HEADERS,
         )
-        # session.request("POST", CONF_URL_SERVICE, data={"smart": self.meter_id}, headers=TauronAmiplusConnector.headers)
+        # session.request("POST", CONF_URL_SERVICE, data={"smart": self.meter_id}, headers=CONST_REQUEST_HEADERS)
         # https://elicznik.tauron-dystrybucja.pl/ustaw_punkt # TODO
+        self.session = session
 
-        return session
-
-    def calculate_configuration(self, session, days_before=2, throw_on_empty=True):
-        json_data, _ = self.get_raw_values_daily(session, days_before)
+    def calculate_configuration(self, days_before=2, throw_on_empty=True):
+        json_data, _ = self.get_raw_values_daily(days_before)
         if json_data is None:
             if throw_on_empty:
                 raise Exception("Failed to login")
@@ -96,69 +93,71 @@ class TauronAmiplusConnector:
         tariff = json_data["data"]["tariff"]
         return tariff
 
-    def get_values_yearly(self, session):
-        year = datetime.datetime.now().year
+    def get_values_yearly(self):
+        now = datetime.datetime.now()
+        first_day_of_year = now.replace(day=1, month=1)
+        last_day_of_year = now.replace(day=31, month=12)
         payload = {
-            "from": f"1.01.{year}",
-            "to": f"31.12.{year}",
+            "from": TauronAmiplusConnector.format_date(first_day_of_year),
+            "to": TauronAmiplusConnector.format_date(last_day_of_year),
             "profile": "year",
             "type": "consum",
         }
-        return TauronAmiplusConnector.get_chart_values(session, payload)
+        return self.get_chart_values(payload)
 
-    def get_values_monthly(self, session):
+    def get_values_monthly(self):
         now = datetime.datetime.now()
         month = now.month
         first_day_of_month = now.replace(day=1)
         last_day_of_month = first_day_of_month.replace(month=month % 12 + 1) - datetime.timedelta(days=1)
 
         payload = {
-            "from": first_day_of_month.strftime(self.date_format),
-            "to": last_day_of_month.strftime(self.date_format),
+            "from": TauronAmiplusConnector.format_date(first_day_of_month),
+            "to": TauronAmiplusConnector.format_date(last_day_of_month),
             "profile": "month",
             "type": "consum",
         }
-        return TauronAmiplusConnector.get_chart_values(session, payload)
+        return self.get_chart_values(payload)
 
-    def get_values_daily(self, session):
-        data, day = self.get_raw_values_daily(session, 1)
-        if data is None or len(data["data"]["allData"]) < 24:
-            data, day = self.get_raw_values_daily(session, 2)
+    def get_values_daily(self):
+        offset = 1
+        data = None
+        day = None
+        while offset <= CONST_MAX_LOOKUP_RANGE and data is None or len(data["data"]["allData"]) < 24:
+            data, day = self.get_raw_values_daily(offset)
+            offset += 1
         return data, day
 
-    def get_raw_values_daily(self, session, days_before):
-        day = (datetime.datetime.now() - datetime.timedelta(days_before)).strftime(self.date_format)
+    def get_raw_values_daily(self, days_before):
+        day = TauronAmiplusConnector.format_date((datetime.datetime.now() - datetime.timedelta(days_before)))
         payload = {
             "from": day,
             "to": day,
             "profile": "full time",
             "type": "consum",
         }
-        return TauronAmiplusConnector.get_chart_values(session, payload), day
+        return self.get_chart_values(payload), day
 
-    def get_readings(self, session, days_before=2):
+    def get_readings(self, days_before):
         date_to = datetime.datetime.now()
         date_from = (date_to - datetime.timedelta(days_before))
 
         payload = {
-                "from": date_from.strftime(self.date_format),
-                "to": date_to.strftime(self.date_format),
-                "profile": "month",
+                "from": TauronAmiplusConnector.format_date(date_from),
+                "to": TauronAmiplusConnector.format_date(date_to),
                 "type": "energia-pobrana"
             }
-        return TauronAmiplusConnector.execute_post(session, CONF_URL_READINGS, payload)
+        return self.execute_post(CONST_URL_READINGS, payload)
 
-    @staticmethod
-    def get_chart_values(session, payload):
-        return TauronAmiplusConnector.execute_post(session, CONF_URL_ENERGY, payload)
+    def get_chart_values(self, payload):
+        return self.execute_post(CONST_URL_ENERGY, payload)
 
-    @staticmethod
-    def execute_post(session, url, payload):
-        response = session.request(
+    def execute_post(self, url, payload):
+        response = self.session.request(
             "POST",
             url,
             data=payload,
-            headers=TauronAmiplusConnector.headers,
+            headers=CONST_REQUEST_HEADERS,
         )
         if response.status_code == 200 and response.text.startswith('{"success":true'):
             json_data = response.json()
@@ -166,10 +165,14 @@ class TauronAmiplusConnector:
         return None
 
     @staticmethod
+    def format_date(date):
+        return date.strftime(CONST_DATE_FORMAT)
+
+    @staticmethod
     def calculate_tariff(username, password, meter_id):
         coordinator = TauronAmiplusConnector(username, password, meter_id, False)
-        session = coordinator.get_session()
-        config = coordinator.calculate_configuration(session)
+        coordinator.login()
+        config = coordinator.calculate_configuration()
         if config is not None:
             return config
         raise Exception("Failed to login")
