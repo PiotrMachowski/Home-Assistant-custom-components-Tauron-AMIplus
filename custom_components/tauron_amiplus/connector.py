@@ -123,7 +123,7 @@ class TauronAmiplusConnector:
         offset = 1
         data = None
         day = None
-        while offset <= CONST_MAX_LOOKUP_RANGE and data is None or len(data["data"]["allData"]) < 24:
+        while offset <= CONST_MAX_LOOKUP_RANGE and (data is None or len(data["data"]["allData"]) < 24):
             data, day = self.get_raw_values_daily(offset)
             offset += 1
         return data, day
@@ -170,9 +170,9 @@ class TauronAmiplusConnector:
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):
-        coordinator = TauronAmiplusConnector(username, password, meter_id, False)
-        coordinator.login()
-        config = coordinator.calculate_configuration()
+        connector = TauronAmiplusConnector(username, password, meter_id, False)
+        connector.login()
+        config = connector.calculate_configuration()
         if config is not None:
             return config
         raise Exception("Failed to login")
