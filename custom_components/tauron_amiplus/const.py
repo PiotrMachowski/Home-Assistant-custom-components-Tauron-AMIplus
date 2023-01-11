@@ -23,7 +23,7 @@ TYPE_GENERATION_DAILY = "generation_daily"
 TYPE_GENERATION_MONTHLY = "generation_monthly"
 TYPE_GENERATION_YEARLY = "generation_yearly"
 
-DEFAULT_UPDATE_INTERVAL = timedelta(hours=12)
+DEFAULT_UPDATE_INTERVAL = timedelta(hours=4)
 SENSOR_TYPES = {
     TYPE_CURRENT_READINGS: [
         "Current meter readings",
