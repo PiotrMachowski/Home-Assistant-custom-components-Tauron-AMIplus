@@ -34,7 +34,6 @@ class TLSAdapter(adapters.HTTPAdapter):
 
 class TauronAmiplusRawData:
     def __init__(self):
-        self.json_readings = None
         self.tariff = None
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
@@ -42,6 +41,7 @@ class TauronAmiplusRawData:
 
 class TauronAmiplusDataSet:
     def __init__(self):
+        self.json_reading = None
         self.json_daily = None
         self.daily_date = None
         self.json_monthly = None
@@ -50,18 +50,16 @@ class TauronAmiplusDataSet:
 
 class TauronAmiplusConnector:
 
-    def __init__(self, username, password, meter_id, generation):
+    def __init__(self, username, password, meter_id):
         self.username = username
         self.password = password
         self.meter_id = meter_id
-        self.generation_enabled = generation
         self.session = None
 
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
         self.login()
 
-        data.json_readings = self.get_readings(CONST_MAX_LOOKUP_RANGE)
         data.consumption = self.get_data_set(generation=False)
         data.generation = self.get_data_set(generation=True)
 
@@ -71,7 +69,7 @@ class TauronAmiplusConnector:
 
     def get_data_set(self, generation) -> TauronAmiplusDataSet:
         dataset = TauronAmiplusDataSet()
-        dataset.json_readings = self.get_readings(CONST_MAX_LOOKUP_RANGE)
+        dataset.json_reading = self.get_reading(generation)
         dataset.json_daily, dataset.daily_date = self.get_values_daily(generation)
         dataset.json_monthly = self.get_values_monthly(generation)
         dataset.json_yearly = self.get_values_yearly(generation)
@@ -156,14 +154,14 @@ class TauronAmiplusConnector:
         }
         return self.get_chart_values(payload), day
 
-    def get_readings(self, days_before):
+    def get_reading(self, generation):
         date_to = datetime.datetime.now()
-        date_from = (date_to - datetime.timedelta(days_before))
+        date_from = (date_to - datetime.timedelta(CONST_MAX_LOOKUP_RANGE))
 
         payload = {
                 "from": TauronAmiplusConnector.format_date(date_from),
                 "to": TauronAmiplusConnector.format_date(date_to),
-                "type": "energia-pobrana"
+                "type": "energia-oddana" if generation else "energia-pobrana"
             }
         return self.execute_post(CONST_URL_READINGS, payload)
 
@@ -188,7 +186,7 @@ class TauronAmiplusConnector:
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):
-        connector = TauronAmiplusConnector(username, password, meter_id, False)
+        connector = TauronAmiplusConnector(username, password, meter_id)
         connector.login()
         config = connector.calculate_configuration()
         if config is not None:

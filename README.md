@@ -46,17 +46,17 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 | `username` | `string` | `True` | - | Username used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
 | `password` | `string` | `True` | - | Password used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
 | `energy_meter_id` | `string` | `True` | - | ID of energy meter |
-| `check_generation` | `boolean` | `False` | `false` | Enables checking energy generation |
 | `monitored_variables` | `list` | `True` | - | List of variables to monitor |
 
 ### Possible monitored conditions
 
 | Key | Description |
 | --- | --- | 
-| `current_readings` | Current readings of a meter |
+| `consumption_reading` | Current consumption reading of a meter |
 | `consumption_daily` | Daily energy consumption **(for previous day!)** |
 | `consumption_monthly` | Monthly energy consumption |
 | `consumption_yearly` | Yearly energy consumption |
+| `generation_reading` | Current generation reading of a meter |
 | `generation_daily` | Daily energy generation **(for previous day!)** |
 | `generation_monthly` | Monthly energy generation |
 | `generation_yearly` | Yearly energy generation |
@@ -70,12 +70,12 @@ sensor:
     username: !secret tauron_amiplus.username
     password: !secret tauron_amiplus.password
     energy_meter_id: !secret tauron_amiplus.energy_meter_id
-    check_generation: true
     monitored_variables:
-      - current_readings
+      - consumption_reading
       - consumption_daily
       - consumption_monthly
       - consumption_yearly
+      - generation_reading
       - generation_daily
       - generation_monthly
       - generation_yearly
