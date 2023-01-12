@@ -1,5 +1,4 @@
 """Support for TAURON sensors."""
-import datetime
 import logging
 
 import homeassistant.helpers.config_validation as cv
@@ -8,9 +7,9 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, 
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (CONF_GENERATION, CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_URL_SERVICE, DEFAULT_NAME,
+from .const import (CONF_GENERATION, CONF_METER_ID, CONF_SHOW_GENERATION, CONST_URL_SERVICE, DEFAULT_NAME,
                     DOMAIN, SENSOR_TYPES, TYPE_CURRENT_READINGS)
-from .coordinator import TauronAmiplusRawData, TauronAmiplusUpdateCoordinator
+from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     await coordinator.async_request_refresh()
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
-        dev.append(TauronAmiplusSensor(coordinator, name, meter_id, generation, variable))
+        dev.append(TauronAmiplusSensor(coordinator, name, meter_id, variable))
     async_add_entities(dev, True)
 
 
@@ -45,7 +44,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     password = entry.data[CONF_PASSWORD]
     meter_id = entry.data[CONF_METER_ID]
     show_generation_sensors = entry.data[CONF_SHOW_GENERATION]
-    tariff = entry.data[CONF_TARIFF]
     sensors = []
     sensor_types = {**SENSOR_TYPES}
     generation = show_generation_sensors or any(sensor_type.startswith("generation") for sensor_type in sensor_types)
@@ -59,7 +57,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
                     coordinator,
                     sensor_name,
                     meter_id,
-                    show_generation_sensors,
                     sensor_type,
                 )
             )
@@ -67,19 +64,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(sensors, True)
 
 
-class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData]):
+class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
-    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, generation, sensor_type):
+    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, sensor_type):
         super().__init__(coordinator)
         self.client_name = name
         self.meter_id = meter_id
-        self.generation_enabled = generation or sensor_type.startswith("generation")
+        self.generation = sensor_type.startswith("generation")
         self.sensor_type = sensor_type
         self.power_zones = None
         self.tariff = None
-        self.power_zones_last_update = None
-        self.power_zones_last_update_tech = datetime.datetime(2000, 1, 1)
-        self.data = None
         self.params = {}
         self._state = None
 
@@ -97,8 +91,6 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
 
     @property
     def native_value(self):
-        if self.sensor_type.startswith("generation"):
-            return None  # TODO support generation
         return self._state
 
     @property
@@ -123,17 +115,18 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
             return None
 
     def _handle_coordinator_update(self) -> None:
-        if self.coordinator.data is None:
+        if not self.available or self.coordinator.data is None:
             return
-        elif self.sensor_type == TYPE_CURRENT_READINGS and self.coordinator.data.json_readings is not None:
+        dataset = self.coordinator.data.generation if self.generation else self.coordinator.data.consumption
+        if self.sensor_type == TYPE_CURRENT_READINGS and self.coordinator.data.json_readings is not None:
             self.update_readings(self.coordinator.data.json_readings, self.coordinator.data.tariff)
-        elif self.sensor_type.endswith("daily") and self.coordinator.data.json_daily is not None:
-            self.update_values(self.coordinator.data.json_daily)
-            self.params = {"date": self.coordinator.data.daily_date, **self.params}
-        elif self.sensor_type.endswith("monthly") and self.coordinator.data.json_monthly is not None:
-            self.update_values(self.coordinator.data.json_monthly)
-        elif self.sensor_type.endswith("yearly") and self.coordinator.data.json_yearly is not None:
-            self.update_values(self.coordinator.data.json_yearly)
+        elif self.sensor_type.endswith("daily") and dataset.json_daily is not None:
+            self.update_values(dataset.json_daily)
+            self.params = {"date": dataset.daily_date, **self.params}
+        elif self.sensor_type.endswith("monthly") and dataset.json_monthly is not None:
+            self.update_values(dataset.json_monthly)
+        elif self.sensor_type.endswith("yearly") and dataset.json_yearly is not None:
+            self.update_values(dataset.json_yearly)
         self.async_write_ha_state()
 
     def update_readings(self, json_data, tariff):
@@ -164,9 +157,9 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity[TauronAmiplusRawData])
 
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
-    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, generation, sensor_type):
+    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, sensor_type):
         """Initialize the sensor."""
-        super().__init__(coordinator, name, meter_id, generation, sensor_type)
+        super().__init__(coordinator, name, meter_id, sensor_type)
 
     @property
     def device_info(self):

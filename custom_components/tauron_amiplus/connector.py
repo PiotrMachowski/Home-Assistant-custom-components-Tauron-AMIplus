@@ -1,4 +1,6 @@
 """Update coordinator for TAURON sensors."""
+from typing import Optional
+
 import datetime
 import logging
 import ssl
@@ -33,11 +35,17 @@ class TLSAdapter(adapters.HTTPAdapter):
 class TauronAmiplusRawData:
     def __init__(self):
         self.json_readings = None
+        self.tariff = None
+        self.consumption: Optional[TauronAmiplusDataSet] = None
+        self.generation: Optional[TauronAmiplusDataSet] = None
+
+
+class TauronAmiplusDataSet:
+    def __init__(self):
         self.json_daily = None
         self.daily_date = None
         self.json_monthly = None
         self.json_yearly = None
-        self.tariff = None
 
 
 class TauronAmiplusConnector:
@@ -52,12 +60,22 @@ class TauronAmiplusConnector:
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
         self.login()
+
         data.json_readings = self.get_readings(CONST_MAX_LOOKUP_RANGE)
-        data.json_daily, data.daily_date = self.get_values_daily()
-        data.json_monthly = self.get_values_monthly()
-        data.json_yearly = self.get_values_yearly()
-        data.tariff = data.json_yearly["data"]["tariff"]
+        data.consumption = self.get_data_set(generation=False)
+        data.generation = self.get_data_set(generation=True)
+
+        if data.consumption.json_yearly is not None:
+            data.tariff = data.consumption.json_yearly["data"]["tariff"]
         return data
+
+    def get_data_set(self, generation) -> TauronAmiplusDataSet:
+        dataset = TauronAmiplusDataSet()
+        dataset.json_readings = self.get_readings(CONST_MAX_LOOKUP_RANGE)
+        dataset.json_daily, dataset.daily_date = self.get_values_daily(generation)
+        dataset.json_monthly = self.get_values_monthly(generation)
+        dataset.json_yearly = self.get_values_yearly(generation)
+        return dataset
 
     def login(self):
         payload_login = {
@@ -93,7 +111,7 @@ class TauronAmiplusConnector:
         tariff = json_data["data"]["tariff"]
         return tariff
 
-    def get_values_yearly(self):
+    def get_values_yearly(self, generation):
         now = datetime.datetime.now()
         first_day_of_year = now.replace(day=1, month=1)
         last_day_of_year = now.replace(day=31, month=12)
@@ -101,11 +119,11 @@ class TauronAmiplusConnector:
             "from": TauronAmiplusConnector.format_date(first_day_of_year),
             "to": TauronAmiplusConnector.format_date(last_day_of_year),
             "profile": "year",
-            "type": "consum",
+            "type": "oze" if generation else "consum",
         }
         return self.get_chart_values(payload)
 
-    def get_values_monthly(self):
+    def get_values_monthly(self, generation):
         now = datetime.datetime.now()
         month = now.month
         first_day_of_month = now.replace(day=1)
@@ -115,26 +133,26 @@ class TauronAmiplusConnector:
             "from": TauronAmiplusConnector.format_date(first_day_of_month),
             "to": TauronAmiplusConnector.format_date(last_day_of_month),
             "profile": "month",
-            "type": "consum",
+            "type": "oze" if generation else "consum",
         }
         return self.get_chart_values(payload)
 
-    def get_values_daily(self):
+    def get_values_daily(self, generation):
         offset = 1
         data = None
         day = None
         while offset <= CONST_MAX_LOOKUP_RANGE and (data is None or len(data["data"]["allData"]) < 24):
-            data, day = self.get_raw_values_daily(offset)
+            data, day = self.get_raw_values_daily(offset, generation)
             offset += 1
         return data, day
 
-    def get_raw_values_daily(self, days_before):
+    def get_raw_values_daily(self, days_before, generation):
         day = TauronAmiplusConnector.format_date((datetime.datetime.now() - datetime.timedelta(days_before)))
         payload = {
             "from": day,
             "to": day,
             "profile": "full time",
-            "type": "consum",
+            "type": "oze" if generation else "consum",
         }
         return self.get_chart_values(payload), day
 

@@ -25,9 +25,17 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
     return {
         "tariff": tariff,
         "raw_data_json_readings": raw_data.json_readings,
-        "raw_data_json_daily": raw_data.json_daily,
-        "raw_data_daily_date": raw_data.daily_date,
-        "raw_data_json_monthly": raw_data.json_monthly,
-        "raw_data_json_yearly": raw_data.json_yearly,
         "raw_data_tariff": raw_data.tariff,
+        "raw_data_consumption": {
+            "json_daily": raw_data.consumption.json_daily,
+            "daily_date": raw_data.consumption.daily_date,
+            "json_monthly": raw_data.consumption.json_monthly,
+            "json_yearly": raw_data.consumption.json_yearly,
+        },
+        "raw_data_generation": {
+            "json_daily": raw_data.generation.json_daily,
+            "daily_date": raw_data.generation.daily_date,
+            "json_monthly": raw_data.generation.json_monthly,
+            "json_yearly": raw_data.generation.json_yearly,
+        },
     }
