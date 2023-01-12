@@ -102,7 +102,7 @@ class TauronAmiplusConnector:
         self.session = session
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
-        json_data, _ = self.get_raw_values_daily(days_before)
+        json_data, _ = self.get_raw_values_daily(days_before, generation=False)
         if json_data is None:
             if throw_on_empty:
                 raise Exception("Failed to login")
