@@ -16,10 +16,13 @@ CONST_URL_READINGS = "https://elicznik.tauron-dystrybucja.pl/odczyty/api"
 CONST_REQUEST_HEADERS = {"cache-control": "no-cache"}
 CONST_CONSUMPTION = "consumption"
 CONST_GENERATION = "generation"
+CONST_BALANCED = "balanced"
 CONST_READING = "reading"
 CONST_DAILY = "daily"
 CONST_MONTHLY = "monthly"
 CONST_YEARLY = "yearly"
+TYPE_BALANCED_DAILY = f"{CONST_BALANCED}_{CONST_DAILY}"
+TYPE_BALANCED_MONTHLY = f"{CONST_BALANCED}_{CONST_MONTHLY}"
 TYPE_CONSUMPTION_READING = f"{CONST_CONSUMPTION}_{CONST_READING}"
 TYPE_CONSUMPTION_DAILY = f"{CONST_CONSUMPTION}_{CONST_DAILY}"
 TYPE_CONSUMPTION_MONTHLY = f"{CONST_CONSUMPTION}_{CONST_MONTHLY}"
@@ -55,4 +58,10 @@ SENSOR_TYPES = {
     TYPE_GENERATION_YEARLY: [
         "Yearly energy generation",
     ],
+    TYPE_BALANCED_DAILY: [
+        "Daily balance"
+    ],
+    TYPE_BALANCED_MONTHLY: [
+        "Monthly balance"
+    ]
 }

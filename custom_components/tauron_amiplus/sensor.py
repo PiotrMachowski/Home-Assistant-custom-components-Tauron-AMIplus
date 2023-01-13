@@ -7,8 +7,9 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, 
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (CONF_METER_ID, CONF_SHOW_GENERATION, CONST_DAILY, CONST_GENERATION, CONST_MONTHLY, CONST_READING,
-                    CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES)
+from .const import (CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_DAILY, CONST_GENERATION, CONST_MONTHLY,
+                    CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES,
+                    TYPE_BALANCED_DAILY, TYPE_BALANCED_MONTHLY)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     password = entry.data[CONF_PASSWORD]
     meter_id = entry.data[CONF_METER_ID]
     show_generation_sensors = entry.data[CONF_SHOW_GENERATION]
+    tariff = entry.data[CONF_TARIFF]
     sensors = []
     sensor_types = {**SENSOR_TYPES}
     coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id)
@@ -55,6 +57,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                     sensor_name,
                     meter_id,
                     sensor_type,
+                    tariff
                 )
             )
 
@@ -112,11 +115,17 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             return None
 
     def _handle_coordinator_update(self) -> None:
-        if not self.available or self.coordinator.data is None:
+        data = self.coordinator.data
+        if not self.available or data is None:
             return
-        dataset = self.coordinator.data.generation if self.generation else self.coordinator.data.consumption
-        if self.sensor_type.endswith(CONST_READING) and dataset.json_reading is not None:
-            self.update_reading(dataset.json_reading, self.coordinator.data.tariff)
+        dataset = data.generation if self.generation else data.consumption
+
+        if self.sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
+            self.update_balanced_data(data.balance_daily, data.tariff)
+        elif self.sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
+            self.update_balanced_data(data.balance_monthly, data.tariff)
+        elif self.sensor_type.endswith(CONST_READING) and dataset.json_reading is not None:
+            self.update_reading(dataset.json_reading, data.tariff)
         elif self.sensor_type.endswith(CONST_DAILY) and dataset.json_daily is not None:
             self.update_values(dataset.json_daily)
             self.params = {"date": dataset.daily_date, **self.params}
@@ -139,12 +148,61 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         self.tariff = tariff
         self.params = zones
 
+    def update_balanced_data(self, balanced_data, tariff):
+        con = balanced_data[0]
+        gen = balanced_data[1]
+        balance, sum_consumption, sum_generation, zones, data_range = TauronAmiplusSensor.get_balanced_data(con, gen)
+        self._state = round(balance, 3)
+        self.tariff = tariff
+        self.params = {
+            "sum_consumption": round(sum_consumption, 3),
+            "sum_generation": round(sum_generation, 3),
+            "data_range": data_range,
+            **{k: round(v, 3) for (k, v) in zones.items()},
+        }
+
     @staticmethod
     def get_data_from_json(json_data):
         total = round(json_data["data"]["sum"], 3)
         tariff = json_data["data"]["tariff"]
-        zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
+        zones = {}
+        if len(json_data["data"]["zones"]) > 0:
+            zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
         return total, tariff, zones
+
+    @staticmethod
+    def get_balanced_data(consumption_data_json, generation_data_json):
+        zone_names = consumption_data_json["data"]["zonesName"]
+        consumption_data = consumption_data_json["data"]["allData"]
+        generation_data = generation_data_json["data"]["allData"]
+        if len(consumption_data) == 0 or len(generation_data) == 0:
+            return 0, 0, 0, {}, ""
+        data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
+
+        sum_consumption = 0
+        sum_generation = 0
+        zones = {}
+
+        for consumption, generation in zip(consumption_data, generation_data):
+            value_consumption = float(consumption["EC"])
+            value_generation = float(generation["EC"])
+            zone = zone_names[consumption["Zone"]]
+            balance = value_consumption - value_generation
+            if balance > 0:
+                sum_consumption += balance
+                zone_key = f"{zone}_consumption"
+                if zone_key not in zones:
+                    zones[zone_key] = 0
+                zones[zone_key] += balance
+            else:
+                sum_generation += balance
+                zone_key = f"{zone}_generation"
+                if zone_key not in zones:
+                    zones[zone_key] = 0
+                zones[zone_key] += balance
+
+        balance = sum_consumption + sum_generation
+        return balance, sum_consumption, sum_generation, zones, data_range
 
     @property
     def unique_id(self):
@@ -154,9 +212,10 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
-    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, sensor_type):
+    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, sensor_type, tariff):
         """Initialize the sensor."""
         super().__init__(coordinator, name, meter_id, sensor_type)
+        self._tariff = tariff
 
     @property
     def device_info(self):
@@ -165,7 +224,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "name": f"eLicznik {self.meter_id}",
             "manufacturer": "TAURON",
             "model": self.meter_id,
-            "sw_version": f"Tariff {self.tariff}",
+            "sw_version": f"Tariff {self._tariff}",
             "via_device": None,
             "configuration_url": CONST_URL_SERVICE,
         }

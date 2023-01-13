@@ -60,6 +60,8 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 | `generation_daily` | Daily energy generation **(for previous day!)** |
 | `generation_monthly` | Monthly energy generation |
 | `generation_yearly` | Yearly energy generation |
+| `balanced_daily` | Daily balance **(for previous day!)** |
+| `balanced_monthly` | Monthly balance |
 
 ## Example usage
 
@@ -79,6 +81,8 @@ sensor:
       - generation_daily
       - generation_monthly
       - generation_yearly
+      - balanced_daily
+      - balanced_monthly
 ```
 
 ## Installation

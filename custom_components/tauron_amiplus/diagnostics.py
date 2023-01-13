@@ -40,4 +40,7 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
             "json_monthly": raw_data.generation.json_monthly,
             "json_yearly": raw_data.generation.json_yearly,
         },
+        "raw_data_balanced": {
+            "balance_monthly": raw_data.balance_monthly
+        }
     }

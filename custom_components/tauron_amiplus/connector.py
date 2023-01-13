@@ -1,9 +1,8 @@
 """Update coordinator for TAURON sensors."""
-from typing import Optional
-
 import datetime
 import logging
 import ssl
+from typing import Optional
 
 import requests
 from requests import adapters
@@ -11,7 +10,6 @@ from urllib3 import poolmanager
 
 from .const import (CONST_DATE_FORMAT, CONST_MAX_LOOKUP_RANGE, CONST_REQUEST_HEADERS, CONST_URL_ENERGY, CONST_URL_LOGIN,
                     CONST_URL_READINGS, CONST_URL_SERVICE)
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +35,16 @@ class TauronAmiplusRawData:
         self.tariff = None
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
+        self.balance_monthly = None
+
+    @property
+    def balance_daily(self):
+        if (self.consumption is None or
+                self.generation is None or
+                self.consumption.json_daily is None or
+                self.generation.json_daily is None):
+            return None
+        return self.consumption.json_daily, self.generation.json_daily
 
 
 class TauronAmiplusDataSet:
@@ -62,7 +70,7 @@ class TauronAmiplusConnector:
 
         data.consumption = self.get_data_set(generation=False)
         data.generation = self.get_data_set(generation=True)
-
+        data.balance_monthly = self.get_raw_data_for_balancing_monthly()
         if data.consumption.json_yearly is not None:
             data.tariff = data.consumption.json_yearly["data"]["tariff"]
         return data
@@ -145,14 +153,29 @@ class TauronAmiplusConnector:
         return data, day
 
     def get_raw_values_daily(self, days_before, generation):
-        day = TauronAmiplusConnector.format_date((datetime.datetime.now() - datetime.timedelta(days_before)))
+        day = datetime.datetime.now() - datetime.timedelta(days_before)
+        return self.get_raw_values_daily_for_range(day, day, generation), TauronAmiplusConnector.format_date(day)
+
+    def get_raw_data_for_balancing_monthly(self):
+        now = datetime.datetime.now()
+        start_day = now.replace(day=1)
+        return self.get_raw_data_for_balancing(start_day, now)
+
+    def get_raw_data_for_balancing(self, start_date, end_date):
+        consumption = self.get_raw_values_daily_for_range(start_date, end_date, False)
+        generation = self.get_raw_values_daily_for_range(start_date, end_date, True)
+        if consumption is None or generation is None:
+            return None
+        return consumption, generation
+
+    def get_raw_values_daily_for_range(self, day_from, day_to, generation):
         payload = {
-            "from": day,
-            "to": day,
+            "from": TauronAmiplusConnector.format_date(day_from),
+            "to": TauronAmiplusConnector.format_date(day_to),
             "profile": "full time",
             "type": "oze" if generation else "consum",
         }
-        return self.get_chart_values(payload), day
+        return self.get_chart_values(payload)
 
     def get_reading(self, generation):
         date_to = datetime.datetime.now()
