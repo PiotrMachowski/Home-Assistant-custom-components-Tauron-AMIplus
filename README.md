@@ -110,6 +110,29 @@ Then restart Home Assistant before applying configuration file changes.
 * **How to get energy meter id?**
   
   To find out value for `energy_meter_id` log in to [_*eLicznik*_](https://elicznik.tauron-dystrybucja.pl). Desired value is in upper-left corner of page (Punkt poboru).
+  
+* **How to calculate available energy as a prosument?**
+
+  To calculate available energy you can use following config:
+  ```yaml
+  input_number:
+    initial_energy_bank:
+      min: 0
+      max: 100000000
+      step: 1
+      mode: box
+  template:
+    - sensor:
+        - name: Tauron energy bank
+          state_class: total
+          device_class: energy
+          unique_id: tauron_energy_bank
+          icon: mdi:home-battery-outline
+          state: "{{ (states('input_number.initial_energy_bank') | float(0) + states('sensor.tauron_amiplus_123_yearly_energy_generation') | float(0) * 0.8 - states('sensor.tauron_amiplus_123_yearly_energy_consumption') | float(0)) | round(3) }}"
+          unit_of_measurement: "kWh"
+          availability: "{{ states('sensor.tauron_amiplus_123_yearly_energy_generation') | is_number and states('sensor.tauron_amiplus_123_yearly_energy_consumption') | is_number }}"
+  ```
+
 
 <a href='https://ko-fi.com/piotrmachowski' target='_blank'><img height='35' style='border:0px;height:46px;' src='https://az743702.vo.msecnd.net/cdn/kofi3.png?v=0' border='0' alt='Buy Me a Coffee at ko-fi.com' />
 <a href="https://paypal.me/PiMachowski" target="_blank"><img src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg" border="0" alt="PayPal Logo" style="height: auto !important;width: auto !important;"></a>
