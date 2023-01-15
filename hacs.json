@@ -1,7 +1,6 @@
 {
   "name": "Tauron AMIplus",
   "render_readme": true,
-  "domains": ["sensor"],
   "zip_release": true,
   "filename": "tauron_amiplus.zip",
   "country": "PL"
