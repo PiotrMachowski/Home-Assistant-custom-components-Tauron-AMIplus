@@ -29,7 +29,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     username = config.get(CONF_USERNAME)
     password = config.get(CONF_PASSWORD)
     meter_id = config.get(CONF_METER_ID)
-    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id)
+    calculate_generation = any(filter(lambda v: CONST_GENERATION in v, config[CONF_MONITORED_VARIABLES]))
+    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, calculate_generation)
     await coordinator.async_request_refresh()
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
@@ -46,7 +47,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     tariff = entry.data[CONF_TARIFF]
     sensors = []
     sensor_types = {**SENSOR_TYPES}
-    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id)
+    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors)
     await coordinator.async_request_refresh()
     for sensor_type in sensor_types:
         if not (sensor_type.startswith(CONST_GENERATION) and not show_generation_sensors):
