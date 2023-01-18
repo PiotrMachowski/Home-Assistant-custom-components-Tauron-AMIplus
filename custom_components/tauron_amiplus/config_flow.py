@@ -3,12 +3,11 @@
 import logging
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
-from .const import CONF_TARIFF, CONF_METER_ID, CONF_SHOW_GENERATION, DOMAIN
 from .connector import TauronAmiplusConnector
+from .const import CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

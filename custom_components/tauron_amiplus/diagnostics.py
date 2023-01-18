@@ -32,6 +32,7 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
             "daily_date": raw_data.consumption.daily_date,
             "json_monthly": raw_data.consumption.json_monthly,
             "json_yearly": raw_data.consumption.json_yearly,
+            "json_month_hourly": raw_data.consumption.json_month_hourly,
         },
         "raw_data_generation": {
             "json_reading": raw_data.generation.json_reading,
@@ -39,8 +40,6 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
             "daily_date": raw_data.generation.daily_date,
             "json_monthly": raw_data.generation.json_monthly,
             "json_yearly": raw_data.generation.json_yearly,
-        },
-        "raw_data_balanced": {
-            "balance_monthly": raw_data.balance_monthly
+            "json_month_hourly": raw_data.generation.json_month_hourly,
         }
     }

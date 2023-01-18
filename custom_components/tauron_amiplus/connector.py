@@ -9,7 +9,7 @@ from requests import adapters
 from urllib3 import poolmanager
 
 from .const import (CONST_DATE_FORMAT, CONST_MAX_LOOKUP_RANGE, CONST_REQUEST_HEADERS, CONST_URL_ENERGY, CONST_URL_LOGIN,
-                    CONST_URL_READINGS, CONST_URL_SERVICE)
+                    CONST_URL_READINGS, CONST_URL_SELECT_METER, CONST_URL_SERVICE)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +35,6 @@ class TauronAmiplusRawData:
         self.tariff = None
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
-        self.balance_monthly = None
 
     @property
     def balance_daily(self):
@@ -46,6 +45,15 @@ class TauronAmiplusRawData:
             return None
         return self.consumption.json_daily, self.generation.json_daily
 
+    @property
+    def balance_monthly(self):
+        if (self.consumption is None or
+                self.generation is None or
+                self.consumption.json_month_hourly is None or
+                self.generation.json_month_hourly is None):
+            return None
+        return self.consumption.json_month_hourly, self.generation.json_month_hourly
+
 
 class TauronAmiplusDataSet:
     def __init__(self):
@@ -54,6 +62,7 @@ class TauronAmiplusDataSet:
         self.daily_date = None
         self.json_monthly = None
         self.json_yearly = None
+        self.json_month_hourly = None
 
 
 class TauronAmiplusConnector:
@@ -70,7 +79,6 @@ class TauronAmiplusConnector:
 
         data.consumption = self.get_data_set(generation=False)
         data.generation = self.get_data_set(generation=True)
-        data.balance_monthly = self.get_raw_data_for_balancing_monthly()
         if data.consumption.json_yearly is not None:
             data.tariff = data.consumption.json_yearly["data"]["tariff"]
         return data
@@ -81,6 +89,7 @@ class TauronAmiplusConnector:
         dataset.json_daily, dataset.daily_date = self.get_values_daily(generation)
         dataset.json_monthly = self.get_values_monthly(generation)
         dataset.json_yearly = self.get_values_yearly(generation)
+        dataset.json_month_hourly = self.get_values_month_hourly(generation)
         return dataset
 
     def login(self):
@@ -156,17 +165,10 @@ class TauronAmiplusConnector:
         day = datetime.datetime.now() - datetime.timedelta(days_before)
         return self.get_raw_values_daily_for_range(day, day, generation), TauronAmiplusConnector.format_date(day)
 
-    def get_raw_data_for_balancing_monthly(self):
+    def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1)
-        return self.get_raw_data_for_balancing(start_day, now)
-
-    def get_raw_data_for_balancing(self, start_date, end_date):
-        consumption = self.get_raw_values_daily_for_range(start_date, end_date, False)
-        generation = self.get_raw_values_daily_for_range(start_date, end_date, True)
-        if consumption is None or generation is None:
-            return None
-        return consumption, generation
+        return self.get_raw_values_daily_for_range(start_day, now, generation)
 
     def get_raw_values_daily_for_range(self, day_from, day_to, generation):
         payload = {
@@ -182,10 +184,10 @@ class TauronAmiplusConnector:
         date_from = (date_to - datetime.timedelta(CONST_MAX_LOOKUP_RANGE))
 
         payload = {
-                "from": TauronAmiplusConnector.format_date(date_from),
-                "to": TauronAmiplusConnector.format_date(date_to),
-                "type": "energia-oddana" if generation else "energia-pobrana"
-            }
+            "from": TauronAmiplusConnector.format_date(date_from),
+            "to": TauronAmiplusConnector.format_date(date_to),
+            "type": "energia-oddana" if generation else "energia-pobrana"
+        }
         return self.execute_post(CONST_URL_READINGS, payload)
 
     def get_chart_values(self, payload):

@@ -2,6 +2,7 @@
 from datetime import timedelta
 
 DOMAIN = "tauron_amiplus"
+STATISTICS_DOMAIN = "tauron_importer"
 DEFAULT_NAME = "Tauron AMIplus"
 DATA_TAURON_CLIENT = "data_client"
 CONF_METER_ID = "energy_meter_id"
@@ -9,10 +10,11 @@ CONF_TARIFF = "tariff"
 CONF_SHOW_GENERATION = "show_generation_sensors"
 CONST_DATE_FORMAT = "%d.%m.%Y"
 CONST_MAX_LOOKUP_RANGE = 7
-CONST_URL_SERVICE = "https://elicznik.tauron-dystrybucja.pl"
 CONST_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"
-CONST_URL_ENERGY = "https://elicznik.tauron-dystrybucja.pl/energia/api"
-CONST_URL_READINGS = "https://elicznik.tauron-dystrybucja.pl/odczyty/api"
+CONST_URL_SERVICE = "https://elicznik.tauron-dystrybucja.pl"
+CONST_URL_SELECT_METER = f"{CONST_URL_SERVICE}/ustaw_punkt"
+CONST_URL_ENERGY = f"{CONST_URL_SERVICE}/energia/api"
+CONST_URL_READINGS = f"{CONST_URL_SERVICE}/odczyty/api"
 CONST_REQUEST_HEADERS = {"cache-control": "no-cache"}
 CONST_CONSUMPTION = "consumption"
 CONST_GENERATION = "generation"
