@@ -112,8 +112,8 @@ class TauronAmiplusConnector:
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
-        # session.request("POST", CONF_URL_SERVICE, data={"smart": self.meter_id}, headers=CONST_REQUEST_HEADERS)
-        # https://elicznik.tauron-dystrybucja.pl/ustaw_punkt # TODO
+        payload_select_meter = {"site[client]": self.meter_id}
+        session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         self.session = session
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
