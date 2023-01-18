@@ -3,7 +3,7 @@
   "name": "Tauron AMIplus",
   "documentation": "https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus",
   "issue_tracker": "https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/issues",
-  "dependencies": [],
+  "dependencies": ["recorder"],
   "codeowners": ["@PiotrMachowski"],
   "requirements": ["requests"],
   "version": "v2.3.0",
