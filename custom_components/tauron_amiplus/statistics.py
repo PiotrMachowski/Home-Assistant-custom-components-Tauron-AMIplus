@@ -21,7 +21,7 @@ async def update_statistics(hass: HomeAssistant, meter_id: str, generation: bool
     raw_data = json_daily["data"]["allData"]
 
     data_type = CONST_GENERATION if generation else CONST_CONSUMPTION
-    statistic_id = f"{STATISTICS_DOMAIN}:{meter_id}_{data_type}"
+    statistic_id = f"{STATISTICS_DOMAIN}:{meter_id}_{data_type}".lower()
     last_stats = await get_instance(hass).async_add_executor_job(
         get_last_statistics, hass, 1, statistic_id, True, {"last_reset", "max", "mean", "min", "state", "sum"})
 
