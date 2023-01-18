@@ -107,6 +107,10 @@ Then restart Home Assistant before applying configuration file changes.
 
 ## FAQ
 
+* **How to display hourly data in Energy dashboard?**
+
+  To show hourly data in Energy dashboard you have to use `tauron_importer` positions.
+
 * **How to get energy meter id?**
   
   To find out value for `energy_meter_id` log in to [_*eLicznik*_](https://elicznik.tauron-dystrybucja.pl). Desired value is in upper-left corner of page (Punkt poboru).
