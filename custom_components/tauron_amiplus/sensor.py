@@ -147,10 +147,11 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         self.tariff = tariff
 
     def update_values(self, json_data):
-        total, tariff, zones = TauronAmiplusSensor.get_data_from_json(json_data)
+        total, tariff, zones, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
         self._state = total
         self.tariff = tariff
-        self.params = zones
+        self.params = {**zones, "data_range": data_range}
+        self.params = {k: v for k, v in self.params.items() if v is not None}
 
     def update_balanced_data(self, balanced_data, tariff):
         con = balanced_data[0]
@@ -170,9 +171,13 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         total = round(json_data["data"]["sum"], 3)
         tariff = json_data["data"]["tariff"]
         zones = {}
+        data_range = None
         if len(json_data["data"]["zones"]) > 0:
             zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
-        return total, tariff, zones
+        if len(json_data["data"]["allData"]) > 0 and "Date" in json_data["data"]["allData"][0]:
+            consumption_data = json_data["data"]["allData"]
+            data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
+        return total, tariff, zones, data_range
 
     @staticmethod
     def get_balanced_data(consumption_data_json, generation_data_json):
