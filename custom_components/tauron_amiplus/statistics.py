@@ -76,13 +76,11 @@ async def update_stats(hass, statistic_id, statistic_name, initial_sum, last_sta
     statistic_data = []
     for raw_hour in raw_data:
         start = get_time(raw_hour)
-        if (last_stats_time is not None
-                and start <= last_stats_time
-                or (
-                        zone_id is not None
-                        and raw_hour["Zone"] != zone_id)):
+        if last_stats_time is not None and start <= last_stats_time:
             continue
         usage = float(raw_hour["EC"])
+        if zone_id is not None and raw_hour["Zone"] != zone_id:
+            usage = 0
         current_sum += usage
         stats = {
             "start": start,
