@@ -7,9 +7,9 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, 
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_DAILY, CONST_GENERATION, CONST_MONTHLY,
-                    CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES,
-                    TYPE_BALANCED_DAILY, TYPE_BALANCED_MONTHLY)
+from .const import (CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_DAILY, CONST_GENERATION,
+                    CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
+                    DOMAIN, SENSOR_TYPES, TYPE_BALANCED_DAILY, TYPE_BALANCED_MONTHLY)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors)
     await coordinator.async_request_refresh()
     for sensor_type in sensor_types:
-        if not (sensor_type.startswith(CONST_GENERATION) and not show_generation_sensors):
+        if not (sensor_type.startswith((CONST_GENERATION, CONST_BALANCED)) and not show_generation_sensors):
             sensor_name = SENSOR_TYPES[sensor_type][0]
             sensors.append(
                 TauronAmiplusConfigFlowSensor(
@@ -108,9 +108,10 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
     @property
     def state_class(self):
-        if self.sensor_type.endswith(CONST_DAILY) or CONST_READING in self.sensor_type:
+        if self.sensor_type.endswith(CONST_DAILY):
             return SensorStateClass.MEASUREMENT
-        elif self.sensor_type.endswith((CONST_MONTHLY, CONST_YEARLY)):
+        elif (self.sensor_type.endswith((CONST_MONTHLY, CONST_YEARLY, CONST_LAST_12_MONTHS)) or
+              CONST_READING in self.sensor_type):
             return SensorStateClass.TOTAL_INCREASING
         else:
             return None
@@ -134,6 +135,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             self.update_values(dataset.json_monthly)
         elif self.sensor_type.endswith(CONST_YEARLY) and dataset.json_yearly is not None:
             self.update_values(dataset.json_yearly)
+        elif self.sensor_type.endswith(CONST_LAST_12_MONTHS) and dataset.json_last_12_months_hourly is not None:
+            self.update_values(dataset.json_last_12_months_hourly)
         self.async_write_ha_state()
 
     def update_reading(self, json_data, tariff):
@@ -144,10 +147,11 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         self.tariff = tariff
 
     def update_values(self, json_data):
-        total, tariff, zones = TauronAmiplusSensor.get_data_from_json(json_data)
+        total, tariff, zones, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
         self._state = total
         self.tariff = tariff
-        self.params = zones
+        self.params = {**zones, "data_range": data_range}
+        self.params = {k: v for k, v in self.params.items() if v is not None}
 
     def update_balanced_data(self, balanced_data, tariff):
         con = balanced_data[0]
@@ -167,9 +171,13 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         total = round(json_data["data"]["sum"], 3)
         tariff = json_data["data"]["tariff"]
         zones = {}
+        data_range = None
         if len(json_data["data"]["zones"]) > 0:
             zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
-        return total, tariff, zones
+        if len(json_data["data"]["allData"]) > 0 and "Date" in json_data["data"]["allData"][0]:
+            consumption_data = json_data["data"]["allData"]
+            data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
+        return total, tariff, zones, data_range
 
     @staticmethod
     def get_balanced_data(consumption_data_json, generation_data_json):

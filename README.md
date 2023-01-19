@@ -56,10 +56,12 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 | `consumption_daily` | Daily energy consumption **(for previous day!)** |
 | `consumption_monthly` | Monthly energy consumption |
 | `consumption_yearly` | Yearly energy consumption |
+| `consumption_last_12_months` | Total energy consumption for last 12 months |
 | `generation_reading` | Current generation reading of a meter |
 | `generation_daily` | Daily energy generation **(for previous day!)** |
 | `generation_monthly` | Monthly energy generation |
 | `generation_yearly` | Yearly energy generation |
+| `generation_last_12_months` | Total energy generation for last 12 months |
 | `balanced_daily` | Daily balance **(for previous day!)** |
 | `balanced_monthly` | Monthly balance |
 
@@ -77,10 +79,12 @@ sensor:
       - consumption_daily
       - consumption_monthly
       - consumption_yearly
+      - consumption_last_12_months
       - generation_reading
       - generation_daily
       - generation_monthly
       - generation_yearly
+      - generation_last_12_months
       - balanced_daily
       - balanced_monthly
 ```

@@ -1,4 +1,3 @@
-"""Support for TAURON sensors."""
 import datetime
 import logging
 
@@ -18,34 +17,58 @@ _LOGGER = logging.getLogger(__name__)
 
 async def update_statistics(hass: HomeAssistant, meter_id: str, generation: bool, json_daily: dict,
                             connector: TauronAmiplusConnector):
+    zones = json_daily["data"]["zonesName"]
     raw_data = json_daily["data"]["allData"]
 
     data_type = CONST_GENERATION if generation else CONST_CONSUMPTION
     statistic_id = f"{STATISTICS_DOMAIN}:{meter_id}_{data_type}".lower()
-    last_stats = await get_instance(hass).async_add_executor_job(
-        get_last_statistics, hass, 1, statistic_id, True, {"last_reset", "max", "mean", "min", "state", "sum"})
+    all_stat_ids = {
+        statistic_id: {
+            "name": f"{DEFAULT_NAME} {meter_id} {data_type}",
+            "zone": None,
+            "sum": 0,
+            "last_stats_time": None,
+            "has_stats": False
+        }
+    }
+    if len(zones) > 0:
+        all_stat_ids.update({
+            f"{statistic_id}_zone_{zone}": {
+                "name": f"{DEFAULT_NAME} {meter_id} {data_type} {zone_name}",
+                "zone": zone,
+                "sum": 0,
+                "last_stats_time": None,
+                "has_stats": False
+            }
+            for zone, zone_name in zones.items()
+        })
 
-    if not last_stats:
-        current_sum = 0
-        last_stats_time = None
+    for k, v in all_stat_ids.items():
+        v["has_stats"] = await has_stats(hass, k)
+
+    if not all([v["has_stats"] for v in all_stat_ids.values()]):
         now = datetime.datetime.now()
         start_range = (now - datetime.timedelta(365)).replace(day=1)
         data_year = await hass.async_add_executor_job(connector.get_raw_values_daily_for_range,
                                                       start_range, now, generation)
         if data_year is not None:
             raw_data = data_year["data"]["allData"]
-    else:
-        stat = await get_instance(hass).async_add_executor_job(
-            statistics_during_period,
-            hass, get_time(raw_data[0]), None, [statistic_id], "hour", None,
-            {"last_reset", "max", "mean", "min", "state", "sum"})
-        current_sum = stat[statistic_id][0]["sum"]
-        last_stats_time = stat[statistic_id][0]["start"]
 
+    for s, v in all_stat_ids.items():
+        if v["has_stats"]:
+            stat = await get_stats(hass, raw_data, statistic_id)
+            v["sum"] = stat[statistic_id][0]["sum"]
+            v["last_stats_time"] = stat[statistic_id][0]["start"]
+    for s, v in all_stat_ids.items():
+        await update_stats(hass, s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data)
+
+
+async def update_stats(hass, statistic_id, statistic_name, initial_sum, last_stats_time, zone_id, raw_data):
+    current_sum = initial_sum
     metadata: StatisticMetaData = {
         "has_mean": False,
         "has_sum": True,
-        "name": f"{DEFAULT_NAME} {meter_id} {data_type}",
+        "name": statistic_name,
         "source": STATISTICS_DOMAIN,
         "statistic_id": statistic_id,
         "unit_of_measurement": ENERGY_KILO_WATT_HOUR
@@ -56,6 +79,8 @@ async def update_statistics(hass: HomeAssistant, meter_id: str, generation: bool
         if last_stats_time is not None and start <= last_stats_time:
             continue
         usage = float(raw_hour["EC"])
+        if zone_id is not None and raw_hour["Zone"] != zone_id:
+            usage = 0
         current_sum += usage
         stats = {
             "start": start,
@@ -63,8 +88,23 @@ async def update_statistics(hass: HomeAssistant, meter_id: str, generation: bool
             "sum": current_sum
         }
         statistic_data.append(stats)
-
     async_add_external_statistics(hass, metadata, statistic_data)
+
+
+async def has_stats(hass, statistic_id):
+    return len(await get_last_stats(hass, statistic_id)) > 0
+
+
+async def get_last_stats(hass, statistic_id):
+    return await get_instance(hass).async_add_executor_job(
+        get_last_statistics,
+        hass, 1, statistic_id, True, {"state", "sum"})
+
+
+async def get_stats(hass, raw_data, statistic_id):
+    return await get_instance(hass).async_add_executor_job(
+        statistics_during_period,
+        hass, get_time(raw_data[0]), None, [statistic_id], "hour", None, {"state", "sum"})
 
 
 def get_time(raw_hour):
