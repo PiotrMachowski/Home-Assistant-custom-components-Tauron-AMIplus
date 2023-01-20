@@ -8,6 +8,7 @@ DATA_TAURON_CLIENT = "data_client"
 CONF_METER_ID = "energy_meter_id"
 CONF_TARIFF = "tariff"
 CONF_SHOW_GENERATION = "show_generation_sensors"
+CONF_SHOW_BALANCED = "show_balanced_sensors"
 CONF_SHOW_12_MONTHS = "show_12_months_sensors"
 CONF_SHOW_CONFIGURABLE = "show_configurable_sensors"
 CONF_SHOW_CONFIGURABLE_DATE = "show_configurable_sensors_date"
@@ -44,7 +45,7 @@ TYPE_GENERATION_LAST_12_MONTHS = f"{CONST_GENERATION}_{CONST_LAST_12_MONTHS}"
 TYPE_GENERATION_CONFIGURABLE = f"{CONST_GENERATION}_{CONST_CONFIGURABLE}"
 
 DEFAULT_UPDATE_INTERVAL = timedelta(hours=8, minutes=30)
-SENSOR_TYPES = {
+SENSOR_TYPES_YAML = {
     TYPE_CONSUMPTION_READING: {
         "name": "Current consumption reading",
     },
@@ -59,9 +60,6 @@ SENSOR_TYPES = {
     },
     TYPE_CONSUMPTION_LAST_12_MONTHS: {
         "name": "Last 12 months energy consumption",
-    },
-    TYPE_CONSUMPTION_CONFIGURABLE: {
-        "name": "Configurable energy consumption",
     },
     TYPE_GENERATION_READING: {
         "name": "Current generation reading",
@@ -78,13 +76,19 @@ SENSOR_TYPES = {
     TYPE_GENERATION_LAST_12_MONTHS: {
         "name": "Last 12 months energy generation",
     },
-    TYPE_GENERATION_CONFIGURABLE: {
-        "name": "Configurable energy generation",
-    },
     TYPE_BALANCED_DAILY: {
         "name": "Daily balance"
     },
     TYPE_BALANCED_MONTHLY: {
         "name": "Monthly balance"
     }
+}
+SENSOR_TYPES = {
+    **SENSOR_TYPES_YAML,
+    TYPE_CONSUMPTION_CONFIGURABLE: {
+        "name": "Configurable energy consumption",
+    },
+    TYPE_GENERATION_CONFIGURABLE: {
+        "name": "Configurable energy generation",
+    },
 }

@@ -69,11 +69,14 @@ class TauronAmiplusDataSet:
 
 class TauronAmiplusConnector:
 
-    def __init__(self, username, password, meter_id, show_12_months, show_configurable, show_configurable_date):
+    def __init__(self, username, password, meter_id, show_generation=False, show_12_months=False, show_balanced=False,
+                 show_configurable=False, show_configurable_date=None):
         self.username = username
         self.password = password
         self.meter_id = meter_id
+        self.show_generation = show_generation
         self.show_12_months = show_12_months
+        self.show_balanced = show_balanced
         self.show_configurable = show_configurable
         self.show_configurable_date = show_configurable_date
         self.session = None
@@ -83,7 +86,10 @@ class TauronAmiplusConnector:
         self.login()
 
         data.consumption = self.get_data_set(generation=False)
-        data.generation = self.get_data_set(generation=True)
+        if self.show_generation or self.show_balanced:
+            data.generation = self.get_data_set(generation=True)
+        else:
+            data.generation = TauronAmiplusDataSet()
         if data.consumption.json_yearly is not None:
             data.tariff = data.consumption.json_yearly["data"]["tariff"]
         return data
@@ -124,8 +130,8 @@ class TauronAmiplusConnector:
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
-        payload_select_meter = {"site[client]": self.meter_id}
-        session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        # payload_select_meter = {"site[client]": self.meter_id}
+        # session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         self.session = session
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
@@ -228,7 +234,7 @@ class TauronAmiplusConnector:
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):
-        connector = TauronAmiplusConnector(username, password, meter_id, False, False, None)
+        connector = TauronAmiplusConnector(username, password, meter_id)
         connector.login()
         config = connector.calculate_configuration()
         if config is not None:

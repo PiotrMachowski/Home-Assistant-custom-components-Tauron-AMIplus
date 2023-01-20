@@ -7,10 +7,12 @@ import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.util.dt import DATE_STR_FORMAT
 
 from .const import (
     CONF_METER_ID,
-    CONF_SHOW_12_MONTHS, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF,
+    CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION,
+    CONF_TARIFF,
     DOMAIN,
 )
 
@@ -50,6 +52,7 @@ async def async_setup_entry(hass, config_entry: ConfigEntry):
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
     )
+    config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     return True
 
 
@@ -78,9 +81,10 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
         }
         options = {
             CONF_SHOW_GENERATION: config_entry.data[CONF_SHOW_GENERATION],
+            CONF_SHOW_BALANCED: False,
             CONF_SHOW_12_MONTHS: False,
             CONF_SHOW_CONFIGURABLE: False,
-            CONF_SHOW_CONFIGURABLE_DATE: datetime.date.today(),
+            CONF_SHOW_CONFIGURABLE_DATE: datetime.date.today().strftime(DATE_STR_FORMAT),
         }
         config_entry.version = 2
         hass.config_entries.async_update_entry(config_entry, data=data, options=options)

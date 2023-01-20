@@ -9,10 +9,12 @@ from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWO
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.dt import parse_date
 
-from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE,
+from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE,
+                    CONF_SHOW_CONFIGURABLE_DATE,
                     CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY,
                     CONST_GENERATION, CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE,
-                    CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, TYPE_BALANCED_DAILY, TYPE_BALANCED_MONTHLY)
+                    CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_DAILY,
+                    TYPE_BALANCED_MONTHLY)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_PASSWORD): cv.string,
     vol.Required(CONF_METER_ID): cv.string,
     vol.Required(CONF_MONITORED_VARIABLES, default=[]):
-        vol.All(cv.ensure_list, [vol.In(SENSOR_TYPES)]),
+        vol.All(cv.ensure_list, [vol.In(SENSOR_TYPES_YAML)]),
     vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
 })
 
@@ -32,8 +34,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     username = config.get(CONF_USERNAME)
     password = config.get(CONF_PASSWORD)
     meter_id = config.get(CONF_METER_ID)
-    calculate_generation = any(filter(lambda v: CONST_GENERATION in v, config[CONF_MONITORED_VARIABLES]))
-    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, calculate_generation)
+
+    show_generation_sensors = any(filter(lambda v: CONST_GENERATION in v, config[CONF_MONITORED_VARIABLES]))
+    show_12_months = any(filter(lambda v: CONST_LAST_12_MONTHS in v, config[CONF_MONITORED_VARIABLES]))
+    show_balanced = any(filter(lambda v: CONST_BALANCED in v, config[CONF_MONITORED_VARIABLES]))
+
+    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, show_generation_sensors,
+                                                 show_12_months, show_balanced)
     await coordinator.async_request_refresh()
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
@@ -50,21 +57,28 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
 
     show_generation_sensors = entry.options.get(CONF_SHOW_GENERATION, False)
     show_12_months = entry.options.get(CONF_SHOW_12_MONTHS, False)
+    show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
     show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
     if show_configurable_date is not None:
         show_configurable_date = parse_date(show_configurable_date)
+    else:
+        show_configurable = False
 
     sensors = []
     sensor_types = {**SENSOR_TYPES}
     if not show_generation_sensors:
-        sensor_types = {k: v for k, v in sensor_types.items() if not k.startswith((CONST_GENERATION, CONST_BALANCED))}
+        sensor_types = {k: v for k, v in sensor_types.items() if not k.startswith(CONST_GENERATION)}
+    if not show_balanced:
+        sensor_types = {k: v for k, v in sensor_types.items() if not k.startswith(CONST_BALANCED)}
     if not show_12_months:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_LAST_12_MONTHS)}
     if not show_configurable:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors, show_12_months, show_configurable, show_configurable_date)
+    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors,
+                                                 show_12_months, show_balanced, show_configurable,
+                                                 show_configurable_date)
     await coordinator.async_request_refresh()
     for sensor_type, sensor_type_config in sensor_types.items():
         sensor_name = sensor_type_config["name"]
@@ -248,7 +262,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self.meter_id)},
-            "name": f"eLicznik {self.meter_id}",
+            "name": f"{DEFAULT_NAME} {self.meter_id}",
             "manufacturer": "TAURON",
             "model": self.meter_id,
             "sw_version": f"Tariff {self._tariff}",

@@ -7,11 +7,10 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.selector import selector
-from homeassistant.util.dt import parse_date
 
 from .connector import TauronAmiplusConnector
-from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE,
-                    CONF_SHOW_GENERATION, CONF_TARIFF, DOMAIN)
+from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE,
+                    CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF, DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,6 +64,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     options = {
                         CONF_SHOW_GENERATION: user_input[CONF_SHOW_GENERATION],
                         CONF_SHOW_12_MONTHS: user_input[CONF_SHOW_12_MONTHS],
+                        CONF_SHOW_BALANCED: user_input[CONF_SHOW_BALANCED],
                         CONF_SHOW_CONFIGURABLE: user_input[CONF_SHOW_CONFIGURABLE],
                         CONF_SHOW_CONFIGURABLE_DATE: user_input[CONF_SHOW_CONFIGURABLE_DATE],
                     }
@@ -83,6 +83,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_USERNAME): str, vol.Required(CONF_PASSWORD): str,
             vol.Required(CONF_METER_ID): str, vol.Required(CONF_SHOW_GENERATION, default=False): bool,
             vol.Required(CONF_SHOW_12_MONTHS, default=False): bool,
+            vol.Required(CONF_SHOW_BALANCED, default=False): bool,
             vol.Required(CONF_SHOW_CONFIGURABLE, default=False): bool,
             vol.Optional(CONF_SHOW_CONFIGURABLE_DATE): selector({"date": {}})
         })
@@ -116,7 +117,9 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle a flow initialized by the user."""
         if user_input is not None:
             self.options.update(user_input)
-            return await self._update_options()
+            output = await self._update_options()
+            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            return output
 
         return self.async_show_form(
             step_id="user",
@@ -124,6 +127,7 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Required(CONF_SHOW_GENERATION, default=self.options[CONF_SHOW_GENERATION]): bool,
                     vol.Required(CONF_SHOW_12_MONTHS, default=self.options[CONF_SHOW_12_MONTHS]): bool,
+                    vol.Required(CONF_SHOW_BALANCED, default=self.options[CONF_SHOW_BALANCED]): bool,
                     vol.Required(CONF_SHOW_CONFIGURABLE, default=self.options[CONF_SHOW_CONFIGURABLE]): bool,
                     vol.Optional(CONF_SHOW_CONFIGURABLE_DATE, default=self.options[CONF_SHOW_CONFIGURABLE_DATE]): selector({"date": {}})
                 }
