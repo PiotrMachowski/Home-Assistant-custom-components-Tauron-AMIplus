@@ -4,12 +4,15 @@ import logging
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.dt import parse_date
 
-from .const import (CONF_METER_ID, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_DAILY, CONST_GENERATION,
-                    CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
-                    DOMAIN, SENSOR_TYPES, TYPE_BALANCED_DAILY, TYPE_BALANCED_MONTHLY)
+from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE,
+                    CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY,
+                    CONST_GENERATION, CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE,
+                    CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, TYPE_BALANCED_DAILY, TYPE_BALANCED_MONTHLY)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,29 +41,42 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     async_add_entities(dev, True)
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     """Set up a TAURON sensor based on a config entry."""
     user = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     meter_id = entry.data[CONF_METER_ID]
-    show_generation_sensors = entry.data[CONF_SHOW_GENERATION]
     tariff = entry.data[CONF_TARIFF]
+
+    show_generation_sensors = entry.options.get(CONF_SHOW_GENERATION, False)
+    show_12_months = entry.options.get(CONF_SHOW_12_MONTHS, False)
+    show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
+    show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+    if show_configurable_date is not None:
+        show_configurable_date = parse_date(show_configurable_date)
+
     sensors = []
     sensor_types = {**SENSOR_TYPES}
-    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors)
+    if not show_generation_sensors:
+        sensor_types = {k: v for k, v in sensor_types.items() if not k.startswith((CONST_GENERATION, CONST_BALANCED))}
+    if not show_12_months:
+        sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_LAST_12_MONTHS)}
+    if not show_configurable:
+        sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
+
+    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors, show_12_months, show_configurable, show_configurable_date)
     await coordinator.async_request_refresh()
-    for sensor_type in sensor_types:
-        if not (sensor_type.startswith((CONST_GENERATION, CONST_BALANCED)) and not show_generation_sensors):
-            sensor_name = SENSOR_TYPES[sensor_type][0]
-            sensors.append(
-                TauronAmiplusConfigFlowSensor(
-                    coordinator,
-                    sensor_name,
-                    meter_id,
-                    sensor_type,
-                    tariff
-                )
+    for sensor_type, sensor_type_config in sensor_types.items():
+        sensor_name = sensor_type_config["name"]
+        sensors.append(
+            TauronAmiplusConfigFlowSensor(
+                coordinator,
+                sensor_name,
+                meter_id,
+                sensor_type,
+                tariff
             )
+        )
 
     async_add_entities(sensors, True)
 
@@ -137,6 +153,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             self.update_values(dataset.json_yearly)
         elif self.sensor_type.endswith(CONST_LAST_12_MONTHS) and dataset.json_last_12_months_hourly is not None:
             self.update_values(dataset.json_last_12_months_hourly)
+        elif self.sensor_type.endswith(CONST_CONFIGURABLE) and dataset.json_configurable_hourly is not None:
+            self.update_values(dataset.json_configurable_hourly)
         self.async_write_ha_state()
 
     def update_reading(self, json_data, tariff):

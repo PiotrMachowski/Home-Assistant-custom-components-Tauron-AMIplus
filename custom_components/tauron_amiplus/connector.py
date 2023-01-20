@@ -64,14 +64,18 @@ class TauronAmiplusDataSet:
         self.json_yearly = None
         self.json_month_hourly = None
         self.json_last_12_months_hourly = None
+        self.json_configurable_hourly = None
 
 
 class TauronAmiplusConnector:
 
-    def __init__(self, username, password, meter_id):
+    def __init__(self, username, password, meter_id, show_12_months, show_configurable, show_configurable_date):
         self.username = username
         self.password = password
         self.meter_id = meter_id
+        self.show_12_months = show_12_months
+        self.show_configurable = show_configurable
+        self.show_configurable_date = show_configurable_date
         self.session = None
 
     def get_raw_data(self) -> TauronAmiplusRawData:
@@ -91,7 +95,13 @@ class TauronAmiplusConnector:
         dataset.json_monthly = self.get_values_monthly(generation)
         dataset.json_yearly = self.get_values_yearly(generation)
         dataset.json_month_hourly = self.get_values_month_hourly(generation)
-        dataset.json_last_12_months_hourly = self.get_values_12_months_hourly(generation)
+        if self.show_12_months:
+            dataset.json_last_12_months_hourly = self.get_values_12_months_hourly(generation)
+        if self.show_configurable:
+            start = self.show_configurable_date
+            end = datetime.datetime.now()
+            dataset.json_configurable_hourly = self.get_raw_values_daily_for_range(start, end, generation)
+
         return dataset
 
     def login(self):
@@ -218,7 +228,7 @@ class TauronAmiplusConnector:
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):
-        connector = TauronAmiplusConnector(username, password, meter_id)
+        connector = TauronAmiplusConnector(username, password, meter_id, False, False, None)
         connector.login()
         config = connector.calculate_configuration()
         if config is not None:

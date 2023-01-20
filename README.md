@@ -84,11 +84,13 @@ sensor:
       - consumption_monthly
       - consumption_yearly
       - consumption_last_12_months
+      - consumption_configurable
       - generation_reading
       - generation_daily
       - generation_monthly
       - generation_yearly
       - generation_last_12_months
+      - generation_configurable
       - balanced_daily
       - balanced_monthly
 ```

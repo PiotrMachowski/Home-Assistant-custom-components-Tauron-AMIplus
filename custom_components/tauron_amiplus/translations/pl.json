@@ -8,7 +8,10 @@
                      "username": "Nazwa użytkownika używana do logowania w eLicznik",
                      "password": "Hasło używane do logowania w eLiczniku",
                      "energy_meter_id": "Punkt poboru",
-                     "show_generation_sensors": "Pokaż energię wygenerowaną"
+                     "show_generation_sensors": "Pokaż energię wygenerowaną",
+          "show_12_months_sensors": "show_12_months_sensors",
+          "show_configurable_sensors": "show_configurable_sensors",
+          "show_configurable_sensors_date": "show_configurable_sensors_date"
                 }
             },
            "confirm": {
@@ -19,5 +22,17 @@
         "error": {
             "server_no_connection": "Nie można połączyć się z serwerem TAURON eLicznik."
         }
+    },
+  "options": {
+    "step": {
+      "user": {
+        "data": {
+          "show_generation_sensors": "Show generation",
+          "show_12_months_sensors": "show_12_months_sensors",
+          "show_configurable_sensors": "show_configurable_sensors",
+          "show_configurable_sensors_date": "show_configurable_sensors_date"
+        }
+      }
     }
+  }
 }
