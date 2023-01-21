@@ -93,7 +93,7 @@ class TauronAmiplusStatisticsUpdater:
             for s in [*suffixes]:
                 suffixes.extend([
                     {
-                        "id": f'{s["id"]}_{zone}',
+                        "id": f'{s["id"]}_zone_{zone}',
                         "name": f'{s["name"]} {zone_name}',
                         "data": s["data"],
                         "zone": zone
