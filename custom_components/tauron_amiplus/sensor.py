@@ -9,11 +9,12 @@ from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWO
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.dt import parse_date
 
+from .connector import TauronAmiplusRawData
 from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE,
-                    CONF_SHOW_CONFIGURABLE_DATE,
-                    CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY,
-                    CONST_GENERATION, CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE,
-                    CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_DAILY,
+                    CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE,
+                    CONST_DAILY, CONST_GENERATION, CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING,
+                    CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML,
+                    TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY, TYPE_BALANCED_LAST_12_MONTHS,
                     TYPE_BALANCED_MONTHLY)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
@@ -147,7 +148,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             return None
 
     def _handle_coordinator_update(self) -> None:
-        data = self.coordinator.data
+        data: TauronAmiplusRawData = self.coordinator.data
         if not self.available or data is None:
             return
         dataset = data.generation if self.generation else data.consumption
@@ -156,6 +157,10 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             self.update_balanced_data(data.balance_daily, data.tariff)
         elif self.sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
             self.update_balanced_data(data.balance_monthly, data.tariff)
+        elif self.sensor_type == TYPE_BALANCED_LAST_12_MONTHS and data.balance_last_12_months_hourly is not None:
+            self.update_balanced_data(data.balance_last_12_months_hourly, data.tariff)
+        elif self.sensor_type == TYPE_BALANCED_CONFIGURABLE and data.balance_configurable_hourly is not None:
+            self.update_balanced_data(data.balance_configurable_hourly, data.tariff)
         elif self.sensor_type.endswith(CONST_READING) and dataset.json_reading is not None:
             self.update_reading(dataset.json_reading, data.tariff)
         elif self.sensor_type.endswith(CONST_DAILY) and dataset.json_daily is not None:

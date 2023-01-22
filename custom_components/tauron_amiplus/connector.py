@@ -36,23 +36,37 @@ class TauronAmiplusRawData:
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
 
+    def data_unavailable(self):
+        return self.consumption is None or self.generation is None
+
     @property
     def balance_daily(self):
-        if (self.consumption is None or
-                self.generation is None or
-                self.consumption.json_daily is None or
-                self.generation.json_daily is None):
+        if self.data_unavailable() or self.consumption.json_daily is None or self.generation.json_daily is None:
             return None
         return self.consumption.json_daily, self.generation.json_daily
 
     @property
     def balance_monthly(self):
-        if (self.consumption is None or
-                self.generation is None or
-                self.consumption.json_month_hourly is None or
+        if (self.data_unavailable() or self.consumption.json_month_hourly is None or
                 self.generation.json_month_hourly is None):
             return None
         return self.consumption.json_month_hourly, self.generation.json_month_hourly
+
+    @property
+    def balance_last_12_months_hourly(self):
+        if (self.data_unavailable() or
+                self.consumption.json_last_12_months_hourly is None or
+                self.generation.json_last_12_months_hourly is None):
+            return None
+        return self.consumption.json_last_12_months_hourly, self.generation.json_last_12_months_hourly
+
+    @property
+    def balance_configurable_hourly(self):
+        if (self.data_unavailable() or
+                self.consumption.json_configurable_hourly is None or
+                self.generation.json_configurable_hourly is None):
+            return None
+        return self.consumption.json_configurable_hourly, self.generation.json_configurable_hourly
 
 
 class TauronAmiplusDataSet:
@@ -130,8 +144,8 @@ class TauronAmiplusConnector:
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
-        # payload_select_meter = {"site[client]": self.meter_id}
-        # session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        payload_select_meter = {"site[client]": self.meter_id}
+        session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         self.session = session
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
@@ -190,7 +204,7 @@ class TauronAmiplusConnector:
 
     def get_values_12_months_hourly(self, generation):
         now = datetime.datetime.now()
-        start_day = now.replace(year=now.year-1)
+        start_day = now.replace(year=now.year - 1)
         return self.get_raw_values_daily_for_range(start_day, now, generation)
 
     def get_raw_values_daily_for_range(self, day_from, day_to, generation):
