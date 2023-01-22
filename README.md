@@ -68,6 +68,7 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 | `generation_last_12_months` | Total energy generation for last 12 months |
 | `balanced_daily` | Daily balance **(for previous day!)** |
 | `balanced_monthly` | Monthly balance |
+| `balanced_last_12_months` | Balance for last 12 months |
 
 ## Example usage
 
@@ -91,6 +92,7 @@ sensor:
       - generation_last_12_months
       - balanced_daily
       - balanced_monthly
+      - balanced_last_12_months
 ```
 
 ## Installation
