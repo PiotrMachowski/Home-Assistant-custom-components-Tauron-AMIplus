@@ -16,12 +16,12 @@
         }
       },
       "confirm": {
-        "description": "This sensor uses unofficial API to get energy usage data from TAURON eLicznik. Do you want to continue?\n",
-        "title": "Tauron AMIplus sensors"
+        "description": "This integration uses unofficial API to get energy usage data from TAURON eLicznik. Do you want to continue?"
       }
     },
     "error": {
-      "server_no_connection": "Cannot connect to TAURON eLicznik server."
+      "server_no_connection": "Cannot connect to TAURON eLicznik server.",
+      "invalid_meter_id": "Invalid energy meter ID"
     }
   },
   "options": {

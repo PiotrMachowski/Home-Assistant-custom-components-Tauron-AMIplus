@@ -1,6 +1,7 @@
 """Config flow to configure TAURON component."""
 
 import logging
+import re
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -46,54 +47,82 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         description_placeholders = {"error_info": ""}
         if user_input is not None:
-            try:
-                # Test the connection
-                tariff = None
-                calculated = await self.hass.async_add_executor_job(
-                    TauronAmiplusConnector.calculate_tariff, user_input[CONF_USERNAME],
-                    user_input[CONF_PASSWORD], user_input[CONF_METER_ID])
-                if calculated is not None:
-                    tariff = calculated
-                if tariff is not None:
-                    data = {
-                        CONF_USERNAME: user_input[CONF_USERNAME],
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        CONF_METER_ID: user_input[CONF_METER_ID],
-                        CONF_TARIFF: tariff
-                    }
-                    options = {
-                        CONF_SHOW_GENERATION: user_input[CONF_SHOW_GENERATION],
-                        CONF_SHOW_12_MONTHS: user_input[CONF_SHOW_12_MONTHS],
-                        CONF_SHOW_BALANCED: user_input[CONF_SHOW_BALANCED],
-                        CONF_SHOW_CONFIGURABLE: user_input[CONF_SHOW_CONFIGURABLE],
-                        CONF_SHOW_CONFIGURABLE_DATE: user_input[CONF_SHOW_CONFIGURABLE_DATE],
-                    }
+            if not re.fullmatch(r"[a-zA-Z_]+", user_input[CONF_METER_ID]):
+                errors[CONF_METER_ID] = "invalid_meter_id"
+            if (user_input.get(CONF_SHOW_CONFIGURABLE, False) is True and
+                    user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None):
+                errors[CONF_SHOW_CONFIGURABLE_DATE] = "missing_configurable_start_date"
 
-                    """Finish config flow"""
-                    return self.async_create_entry(title=f"eLicznik {user_input[CONF_METER_ID]}", data=data,
-                                                   options=options)
-                errors = {CONF_METER_ID: "server_no_connection"}
-                description_placeholders = {"error_info": str(calculated)}
-            except Exception as e:
-                errors = {CONF_METER_ID: "server_no_connection"}
-                description_placeholders = {"error_info": str(e)}
-                _LOGGER.error(str(e))
+            if len(errors) == 0:
+                try:
+                    tariff = None
+                    calculated = await self.hass.async_add_executor_job(
+                        TauronAmiplusConnector.calculate_tariff, user_input[CONF_USERNAME],
+                        user_input[CONF_PASSWORD], user_input[CONF_METER_ID])
+                    if calculated is not None:
+                        tariff = calculated
+                    if tariff is not None:
+                        data = {
+                            CONF_USERNAME: user_input[CONF_USERNAME],
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                            CONF_METER_ID: user_input[CONF_METER_ID],
+                            CONF_TARIFF: tariff
+                        }
+                        options = {
+                            CONF_SHOW_GENERATION: user_input.get(CONF_SHOW_GENERATION, False),
+                            CONF_SHOW_12_MONTHS: user_input.get(CONF_SHOW_12_MONTHS, False),
+                            CONF_SHOW_BALANCED: user_input.get(CONF_SHOW_BALANCED, False),
+                            CONF_SHOW_CONFIGURABLE: user_input.get(CONF_SHOW_CONFIGURABLE, False),
+                            CONF_SHOW_CONFIGURABLE_DATE: user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None),
+                        }
 
-        data_schema = vol.Schema({
-            vol.Required(CONF_USERNAME): str, vol.Required(CONF_PASSWORD): str,
-            vol.Required(CONF_METER_ID): str, vol.Required(CONF_SHOW_GENERATION, default=False): bool,
-            vol.Required(CONF_SHOW_12_MONTHS, default=False): bool,
-            vol.Required(CONF_SHOW_BALANCED, default=False): bool,
-            vol.Required(CONF_SHOW_CONFIGURABLE, default=False): bool,
-            vol.Optional(CONF_SHOW_CONFIGURABLE_DATE): selector({"date": {}})
-        })
+                        """Finish config flow"""
+                        return self.async_create_entry(title=f"eLicznik {user_input[CONF_METER_ID]}", data=data,
+                                                       options=options)
+                    errors = {CONF_PASSWORD: "server_no_connection"}
+                    description_placeholders = {"error_info": str(calculated)}
+                except Exception as e:
+                    errors = {CONF_PASSWORD: "server_no_connection"}
+                    description_placeholders = {"error_info": str(e)}
+                    _LOGGER.error(str(e))
+
+            return self.async_show_form(
+                step_id="init",
+                data_schema=self.get_schema(user_input),
+                errors=errors,
+                description_placeholders=description_placeholders,
+            )
 
         return self.async_show_form(
             step_id="init",
-            data_schema=data_schema,
+            data_schema=self.get_schema(),
             errors=errors,
             description_placeholders=description_placeholders,
         )
+
+    @staticmethod
+    def get_schema(user_input=None):
+        if user_input is None:
+            user_input = {}
+        data_schema = vol.Schema({
+            vol.Required(CONF_USERNAME,
+                         default=user_input.get(CONF_USERNAME, vol.UNDEFINED)): str,
+            vol.Required(CONF_PASSWORD,
+                         default=user_input.get(CONF_PASSWORD, vol.UNDEFINED)): str,
+            vol.Required(CONF_METER_ID,
+                         default=user_input.get(CONF_METER_ID, vol.UNDEFINED)): str,
+            vol.Required(CONF_SHOW_GENERATION,
+                         default=user_input.get(CONF_SHOW_GENERATION, vol.UNDEFINED)): bool,
+            vol.Required(CONF_SHOW_12_MONTHS,
+                         default=user_input.get(CONF_SHOW_12_MONTHS, vol.UNDEFINED)): bool,
+            vol.Required(CONF_SHOW_BALANCED,
+                         default=user_input.get(CONF_SHOW_BALANCED, vol.UNDEFINED)): bool,
+            vol.Required(CONF_SHOW_CONFIGURABLE,
+                         default=user_input.get(CONF_SHOW_CONFIGURABLE, vol.UNDEFINED)): bool,
+            vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
+                         default=user_input.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)): selector({"date": {}})
+        })
+        return data_schema
 
     @staticmethod
     @callback
@@ -125,11 +154,21 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SHOW_GENERATION, default=self.options[CONF_SHOW_GENERATION]): bool,
-                    vol.Required(CONF_SHOW_12_MONTHS, default=self.options[CONF_SHOW_12_MONTHS]): bool,
-                    vol.Required(CONF_SHOW_BALANCED, default=self.options[CONF_SHOW_BALANCED]): bool,
-                    vol.Required(CONF_SHOW_CONFIGURABLE, default=self.options[CONF_SHOW_CONFIGURABLE]): bool,
-                    vol.Optional(CONF_SHOW_CONFIGURABLE_DATE, default=self.options[CONF_SHOW_CONFIGURABLE_DATE]): selector({"date": {}})
+                    vol.Required(CONF_SHOW_GENERATION,
+                                 default=self.options.get(CONF_SHOW_GENERATION, False)
+                                 ): bool,
+                    vol.Required(CONF_SHOW_12_MONTHS,
+                                 default=self.options.get(CONF_SHOW_12_MONTHS, False)
+                                 ): bool,
+                    vol.Required(CONF_SHOW_BALANCED,
+                                 default=self.options.get(CONF_SHOW_BALANCED, False)
+                                 ): bool,
+                    vol.Required(CONF_SHOW_CONFIGURABLE,
+                                 default=self.options.get(CONF_SHOW_CONFIGURABLE, False)
+                                 ): bool,
+                    vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
+                                 default=self.options.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)
+                                 ): selector({"date": {}})
                 }
             ),
         )
