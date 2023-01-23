@@ -16,8 +16,7 @@
         }
       },
       "confirm": {
-        "description": "Ta integracja używa nieoficjalnego API do pobierania danych o zużyciu energii z TAURON eLicznik. Czy chcesz kontynuować?\n\n",
-        "title": "Tauron AMIplus"
+        "description": "Ta integracja używa nieoficjalnego API do pobierania danych o zużyciu energii z TAURON eLicznik. Czy chcesz kontynuować?"
       }
     },
     "error": {
