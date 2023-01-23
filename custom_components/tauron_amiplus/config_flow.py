@@ -62,11 +62,11 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_TARIFF: tariff
                     }
                     options = {
-                        CONF_SHOW_GENERATION: user_input[CONF_SHOW_GENERATION],
-                        CONF_SHOW_12_MONTHS: user_input[CONF_SHOW_12_MONTHS],
-                        CONF_SHOW_BALANCED: user_input[CONF_SHOW_BALANCED],
-                        CONF_SHOW_CONFIGURABLE: user_input[CONF_SHOW_CONFIGURABLE],
-                        CONF_SHOW_CONFIGURABLE_DATE: user_input[CONF_SHOW_CONFIGURABLE_DATE],
+                        CONF_SHOW_GENERATION: user_input.get(CONF_SHOW_GENERATION, False),
+                        CONF_SHOW_12_MONTHS: user_input.get(CONF_SHOW_12_MONTHS, False),
+                        CONF_SHOW_BALANCED: user_input.get(CONF_SHOW_BALANCED, False),
+                        CONF_SHOW_CONFIGURABLE: user_input.get(CONF_SHOW_CONFIGURABLE, False),
+                        CONF_SHOW_CONFIGURABLE_DATE: user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None),
                     }
 
                     """Finish config flow"""
@@ -125,11 +125,21 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SHOW_GENERATION, default=self.options[CONF_SHOW_GENERATION]): bool,
-                    vol.Required(CONF_SHOW_12_MONTHS, default=self.options[CONF_SHOW_12_MONTHS]): bool,
-                    vol.Required(CONF_SHOW_BALANCED, default=self.options[CONF_SHOW_BALANCED]): bool,
-                    vol.Required(CONF_SHOW_CONFIGURABLE, default=self.options[CONF_SHOW_CONFIGURABLE]): bool,
-                    vol.Optional(CONF_SHOW_CONFIGURABLE_DATE, default=self.options[CONF_SHOW_CONFIGURABLE_DATE]): selector({"date": {}})
+                    vol.Required(CONF_SHOW_GENERATION,
+                                 default=self.options.get(CONF_SHOW_GENERATION, False)
+                                 ): bool,
+                    vol.Required(CONF_SHOW_12_MONTHS,
+                                 default=self.options.get(CONF_SHOW_12_MONTHS, False)
+                                 ): bool,
+                    vol.Required(CONF_SHOW_BALANCED,
+                                 default=self.options.get(CONF_SHOW_BALANCED, False)
+                                 ): bool,
+                    vol.Required(CONF_SHOW_CONFIGURABLE,
+                                 default=self.options.get(CONF_SHOW_CONFIGURABLE, False)
+                                 ): bool,
+                    vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
+                                 default=self.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+                                 ): selector({"date": {}})
                 }
             ),
         )
