@@ -97,6 +97,9 @@ sensor:
 
 ## Installation
 
+| Since v2.3.0 this integration requires Home Assistant version 2021.12 or latter |
+| --- |
+
 ### Using [HACS](https://hacs.xyz/) (recommended)
 
 * In _Integrations_ section add repository "Tauron AMIplus"
@@ -124,8 +127,14 @@ Then restart Home Assistant before applying configuration file changes.
 * **How to get energy meter id?**
   
   To find out value for `energy_meter_id` log in to [_*eLicznik*_](https://elicznik.tauron-dystrybucja.pl).
-  Desired value is in upper-left corner of page (Punkt poboru, without address).
+  Desired value is in upper-left corner of page (Punkt poboru - without address).
   
+* **When does this integration update data from?**
+
+  This integration logs in and downloads data from eLicznik website every 8.5h.
+  This timer is restarted after: HA restart, integration reload, configuration change.
+  Additionally, a new pack of data is freshly downloaded when user retrieves diagnostics data.
+
 * **How to calculate available energy as a prosument?**
 
   To calculate available energy you can use following config:
