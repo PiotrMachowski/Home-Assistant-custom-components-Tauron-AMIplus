@@ -97,7 +97,7 @@ sensor:
 
 ## Installation
 
-| Since v2.3.0 this integration requires Home Assistant version 2021.12 or latter |
+| Since v2.3.0 this integration requires Home Assistant version 2022.12 or latter |
 | --- |
 
 ### Using [HACS](https://hacs.xyz/) (recommended)
