@@ -26,14 +26,14 @@ class TauronAmiplusStatisticsUpdater:
         self.show_balanced = show_balanced
 
     async def update_all(self, last_data: TauronAmiplusRawData) -> None:
-        if last_data.consumption is None or last_data.consumption.json_daily is None:
+        if last_data.consumption is None or last_data.consumption.json_last_30_days_hourly is None:
             return
-        raw_data = {CONST_CONSUMPTION: last_data.consumption.json_daily["data"]["allData"]}
-        zones = last_data.consumption.json_daily["data"]["zonesName"]
+        raw_data = {CONST_CONSUMPTION: last_data.consumption.json_last_30_days_hourly["data"]["allData"]}
+        zones = last_data.consumption.json_last_30_days_hourly["data"]["zonesName"]
         if self.show_generation or self.show_balanced:
-            if last_data.generation is None or last_data.generation.json_daily is None:
+            if last_data.generation is None or last_data.generation.json_last_30_days_hourly is None:
                 return
-            raw_data[CONST_GENERATION] = last_data.generation.json_daily["data"]["allData"]
+            raw_data[CONST_GENERATION] = last_data.generation.json_last_30_days_hourly["data"]["allData"]
 
         all_stat_ids = await self.prepare_stats_ids(zones)
 
@@ -51,7 +51,7 @@ class TauronAmiplusStatisticsUpdater:
                     raw_data[CONST_GENERATION] = data_generation["data"]["allData"]
         for s, v in all_stat_ids.items():
             if v["has_stats"]:
-                stat = await self.get_stats(raw_data[CONST_CONSUMPTION], s)
+                stat = await self.get_stats(raw_data[v["data_source"]], s)
                 v["sum"] = stat[s][0]["sum"]
                 v["last_stats_time"] = stat[s][0]["start"]
         if self.show_balanced:
