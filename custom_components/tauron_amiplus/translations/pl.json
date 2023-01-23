@@ -7,7 +7,7 @@
         "data": {
           "username": "Nazwa użytkownika używana do logowania w eLicznik",
           "password": "Hasło używane do logowania w eLiczniku",
-          "energy_meter_id": "Punkt poboru",
+          "energy_meter_id": "ID punktu poboru",
           "show_generation_sensors": "Włącz pobieranie energii oddanej",
           "show_balanced_sensors": "Włącz obliczanie bilansowania godzinnego",
           "show_12_months_sensors": "Włącz sensory zakresu 12 miesięcy",
@@ -17,11 +17,13 @@
       },
       "confirm": {
         "description": "Ta integracja używa nieoficjalnego API do pobierania danych o zużyciu energii z TAURON eLicznik. Czy chcesz kontynuować?\n\n",
-        "title": "Tauron AMIplus sensors"
+        "title": "Tauron AMIplus"
       }
     },
     "error": {
-      "server_no_connection": "Nie można połączyć się z serwerem TAURON eLicznik."
+      "server_no_connection": "Nie można połączyć się z serwerem TAURON eLicznik.",
+      "invalid_meter_id": "Nieprawidłowe ID punktu poboru",
+      "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych"
     }
   },
   "options": {
