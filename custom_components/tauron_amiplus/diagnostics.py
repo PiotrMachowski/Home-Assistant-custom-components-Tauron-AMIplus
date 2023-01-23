@@ -44,6 +44,7 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
             "json_monthly": raw_data.consumption.json_monthly,
             "json_yearly": raw_data.consumption.json_yearly,
             "json_month_hourly": raw_data.consumption.json_month_hourly,
+            "json_last_30_days_hourly": raw_data.consumption.json_last_30_days_hourly,
             "json_last_12_months_hourly": raw_data.consumption.json_last_12_months_hourly,
             "json_configurable_hourly": raw_data.consumption.json_configurable_hourly,
         },
@@ -54,6 +55,7 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
             "json_monthly": raw_data.generation.json_monthly,
             "json_yearly": raw_data.generation.json_yearly,
             "json_month_hourly": raw_data.generation.json_month_hourly,
+            "json_last_30_days_hourly": raw_data.generation.json_last_30_days_hourly,
             "json_last_12_months_hourly": raw_data.generation.json_last_12_months_hourly,
             "json_configurable_hourly": raw_data.generation.json_configurable_hourly,
         }

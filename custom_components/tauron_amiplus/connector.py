@@ -77,6 +77,7 @@ class TauronAmiplusDataSet:
         self.json_monthly = None
         self.json_yearly = None
         self.json_month_hourly = None
+        self.json_last_30_days_hourly = None
         self.json_last_12_months_hourly = None
         self.json_configurable_hourly = None
 
@@ -115,6 +116,7 @@ class TauronAmiplusConnector:
         dataset.json_monthly = self.get_values_monthly(generation)
         dataset.json_yearly = self.get_values_yearly(generation)
         dataset.json_month_hourly = self.get_values_month_hourly(generation)
+        dataset.json_last_30_days_hourly = self.get_values_last_30_days_hourly(generation)
         if self.show_12_months:
             dataset.json_last_12_months_hourly = self.get_values_12_months_hourly(generation)
         if self.show_configurable:
@@ -200,6 +202,11 @@ class TauronAmiplusConnector:
     def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1)
+        return self.get_raw_values_daily_for_range(start_day, now, generation)
+
+    def get_values_last_30_days_hourly(self, generation):
+        now = datetime.datetime.now()
+        start_day = now - datetime.timedelta(days=30)
         return self.get_raw_values_daily_for_range(start_day, now, generation)
 
     def get_values_12_months_hourly(self, generation):
