@@ -123,7 +123,8 @@ Then restart Home Assistant before applying configuration file changes.
 
 * **How to get energy meter id?**
   
-  To find out value for `energy_meter_id` log in to [_*eLicznik*_](https://elicznik.tauron-dystrybucja.pl). Desired value is in upper-left corner of page (Punkt poboru).
+  To find out value for `energy_meter_id` log in to [_*eLicznik*_](https://elicznik.tauron-dystrybucja.pl).
+  Desired value is in upper-left corner of page (Punkt poboru, without address).
   
 * **How to calculate available energy as a prosument?**
 
