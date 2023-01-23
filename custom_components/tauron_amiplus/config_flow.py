@@ -47,7 +47,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         description_placeholders = {"error_info": ""}
         if user_input is not None:
-            if not re.fullmatch(r"[a-zA-Z_]+", user_input[CONF_METER_ID]):
+            if not re.fullmatch(r"[a-zA-Z0-9_]+", user_input[CONF_METER_ID]):
                 errors[CONF_METER_ID] = "invalid_meter_id"
             if (user_input.get(CONF_SHOW_CONFIGURABLE, False) is True and
                     user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None):
