@@ -136,7 +136,7 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         """Initialize HACS options flow."""
         self.config_entry = config_entry
-        self.options = dict(config_entry.options)
+        self.options = {k: v if v is not None else vol.UNDEFINED for k, v in config_entry.options}
 
     async def async_step_init(self, user_input=None):  # pylint: disable=unused-argument
         """Manage the options."""
