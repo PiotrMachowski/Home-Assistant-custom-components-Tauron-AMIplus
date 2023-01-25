@@ -36,6 +36,9 @@
           "show_configurable_sensors_date": "Start date for configurable sensors"
         }
       }
+    },
+    "error": {
+      "missing_configurable_start_date": "Missing start date for configurable sensors"
     }
   }
 }

@@ -36,6 +36,9 @@
           "show_configurable_sensors_date": "Początek okresu dla sensorów konfigurowalnych"
         }
       }
+    },
+    "error": {
+      "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych"
     }
   }
 }

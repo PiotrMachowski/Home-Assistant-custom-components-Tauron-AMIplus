@@ -144,34 +144,43 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
+        errors = {}
         if user_input is not None:
-            self.options.update(user_input)
-            output = await self._update_options()
-            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-            return output
+            if (user_input.get(CONF_SHOW_CONFIGURABLE, False) is True and
+                    user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None):
+                errors[CONF_SHOW_CONFIGURABLE_DATE] = "missing_configurable_start_date"
+            if len(errors) == 0:
+                self.options.update(user_input)
+                output = await self._update_options()
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return output
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_SHOW_GENERATION,
-                                 default=self.options.get(CONF_SHOW_GENERATION, False)
+                                 default=self.get_option(CONF_SHOW_GENERATION, False)
                                  ): bool,
                     vol.Required(CONF_SHOW_12_MONTHS,
-                                 default=self.options.get(CONF_SHOW_12_MONTHS, False)
+                                 default=self.get_option(CONF_SHOW_12_MONTHS, False)
                                  ): bool,
                     vol.Required(CONF_SHOW_BALANCED,
-                                 default=self.options.get(CONF_SHOW_BALANCED, False)
+                                 default=self.get_option(CONF_SHOW_BALANCED, False)
                                  ): bool,
                     vol.Required(CONF_SHOW_CONFIGURABLE,
-                                 default=self.options.get(CONF_SHOW_CONFIGURABLE, False)
+                                 default=self.get_option(CONF_SHOW_CONFIGURABLE, False)
                                  ): bool,
                     vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
-                                 default=self.options.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)
+                                 default=self.get_option(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)
                                  ): selector({"date": {}})
                 }
             ),
+            errors=errors
         )
+
+    def get_option(self, key, default):
+        return self.options.get(key, default) if self.options.get(key, default) is not None else default
 
     async def _update_options(self):
         """Update config entry options."""

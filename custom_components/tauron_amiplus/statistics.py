@@ -49,15 +49,17 @@ class TauronAmiplusStatisticsUpdater:
                                                                          start_range, now, True)
                 if data_generation is not None:
                     raw_data[CONST_GENERATION] = data_generation["data"]["allData"]
+
+        if self.show_balanced:
+            balanced_consumption, balanced_generation = self.prepare_balanced_raw_data(raw_data)
+            raw_data[f"{CONST_BALANCED}_{CONST_CONSUMPTION}"] = balanced_consumption
+            raw_data[f"{CONST_BALANCED}_{CONST_GENERATION}"] = balanced_generation
+
         for s, v in all_stat_ids.items():
             if v["has_stats"]:
                 stat = await self.get_stats(raw_data[v["data_source"]], s)
                 v["sum"] = stat[s][0]["sum"]
                 v["last_stats_time"] = stat[s][0]["start"]
-        if self.show_balanced:
-            balanced_consumption, balanced_generation = self.prepare_balanced_raw_data(raw_data)
-            raw_data[f"{CONST_BALANCED}_{CONST_CONSUMPTION}"] = balanced_consumption
-            raw_data[f"{CONST_BALANCED}_{CONST_GENERATION}"] = balanced_generation
 
         for s, v in all_stat_ids.items():
             await self.update_stats(s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data[v["data_source"]])

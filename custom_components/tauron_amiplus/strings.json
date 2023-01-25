@@ -21,7 +21,8 @@
     },
     "error": {
       "server_no_connection": "Cannot connect to TAURON eLicznik server.",
-      "invalid_meter_id": "Invalid energy meter ID"
+      "invalid_meter_id": "Invalid energy meter ID",
+      "missing_configurable_start_date": "Missing start date for configurable sensors"
     }
   },
   "options": {
@@ -35,6 +36,9 @@
           "show_configurable_sensors_date": "Start date for configurable sensors"
         }
       }
+    },
+    "error": {
+      "missing_configurable_start_date": "Missing start date for configurable sensors"
     }
   }
 }
