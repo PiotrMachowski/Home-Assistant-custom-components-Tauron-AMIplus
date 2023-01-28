@@ -45,7 +45,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     await coordinator.async_request_refresh()
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
-        dev.append(TauronAmiplusSensor(coordinator, name, meter_id, variable))
+        sensor_type_config = SENSOR_TYPES[variable]
+        dev.append(TauronAmiplusSensor(coordinator, name, meter_id, variable, sensor_type_config["state_class"]))
     async_add_entities(dev, True)
 
 
@@ -82,13 +83,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
                                                  show_configurable_date)
     await coordinator.async_request_refresh()
     for sensor_type, sensor_type_config in sensor_types.items():
-        sensor_name = sensor_type_config["name"]
         sensors.append(
             TauronAmiplusConfigFlowSensor(
                 coordinator,
-                sensor_name,
+                sensor_type_config["name"],
                 meter_id,
                 sensor_type,
+                sensor_type_config["state_class"],
                 tariff
             )
         )
@@ -98,20 +99,22 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
 
 class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
-    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str):
+    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
+                 state_class: SensorStateClass):
         super().__init__(coordinator)
-        self.client_name = name
-        self.meter_id = meter_id
-        self.generation = sensor_type.startswith(CONST_GENERATION)
-        self.sensor_type = sensor_type
-        self.power_zones = None
-        self.tariff = None
-        self.params = {}
+        self._client_name = name
+        self._meter_id = meter_id
+        self._generation = sensor_type.startswith(CONST_GENERATION)
+        self._sensor_type = sensor_type
+        self._state_class = state_class
+        self._power_zones = None
+        self._tariff = None
+        self._params = {}
         self._state = None
 
     @property
     def name(self):
-        return f"{self.client_name} {self.sensor_type}"
+        return f"{self._client_name} {self._sensor_type}"
 
     @property
     def native_unit_of_measurement(self):
@@ -128,8 +131,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     @property
     def extra_state_attributes(self):
         _params = {
-            "tariff": self.tariff,
-            **self.params,
+            "tariff": self._tariff,
+            **self._params,
         }
         return _params
 
@@ -139,40 +142,34 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
     @property
     def state_class(self):
-        if self.sensor_type.endswith(CONST_DAILY):
-            return SensorStateClass.MEASUREMENT
-        elif (self.sensor_type.endswith((CONST_MONTHLY, CONST_YEARLY, CONST_LAST_12_MONTHS)) or
-              CONST_READING in self.sensor_type):
-            return SensorStateClass.TOTAL_INCREASING
-        else:
-            return None
+        return self._state_class
 
     def _handle_coordinator_update(self) -> None:
         data: TauronAmiplusRawData = self.coordinator.data
         if not self.available or data is None:
             return
-        dataset = data.generation if self.generation else data.consumption
+        dataset = data.generation if self._generation else data.consumption
 
-        if self.sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
+        if self._sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
             self.update_balanced_data(data.balance_daily, data.tariff)
-        elif self.sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
+        elif self._sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
             self.update_balanced_data(data.balance_monthly, data.tariff)
-        elif self.sensor_type == TYPE_BALANCED_LAST_12_MONTHS and data.balance_last_12_months_hourly is not None:
+        elif self._sensor_type == TYPE_BALANCED_LAST_12_MONTHS and data.balance_last_12_months_hourly is not None:
             self.update_balanced_data(data.balance_last_12_months_hourly, data.tariff)
-        elif self.sensor_type == TYPE_BALANCED_CONFIGURABLE and data.balance_configurable_hourly is not None:
+        elif self._sensor_type == TYPE_BALANCED_CONFIGURABLE and data.balance_configurable_hourly is not None:
             self.update_balanced_data(data.balance_configurable_hourly, data.tariff)
-        elif self.sensor_type.endswith(CONST_READING) and dataset.json_reading is not None:
+        elif self._sensor_type.endswith(CONST_READING) and dataset.json_reading is not None:
             self.update_reading(dataset.json_reading, data.tariff)
-        elif self.sensor_type.endswith(CONST_DAILY) and dataset.json_daily is not None:
+        elif self._sensor_type.endswith(CONST_DAILY) and dataset.json_daily is not None:
             self.update_values(dataset.json_daily)
-            self.params = {"date": dataset.daily_date, **self.params}
-        elif self.sensor_type.endswith(CONST_MONTHLY) and dataset.json_monthly is not None:
+            self._params = {"date": dataset.daily_date, **self._params}
+        elif self._sensor_type.endswith(CONST_MONTHLY) and dataset.json_monthly is not None:
             self.update_values(dataset.json_monthly)
-        elif self.sensor_type.endswith(CONST_YEARLY) and dataset.json_yearly is not None:
+        elif self._sensor_type.endswith(CONST_YEARLY) and dataset.json_yearly is not None:
             self.update_values(dataset.json_yearly)
-        elif self.sensor_type.endswith(CONST_LAST_12_MONTHS) and dataset.json_last_12_months_hourly is not None:
+        elif self._sensor_type.endswith(CONST_LAST_12_MONTHS) and dataset.json_last_12_months_hourly is not None:
             self.update_values(dataset.json_last_12_months_hourly)
-        elif self.sensor_type.endswith(CONST_CONFIGURABLE) and dataset.json_configurable_hourly is not None:
+        elif self._sensor_type.endswith(CONST_CONFIGURABLE) and dataset.json_configurable_hourly is not None:
             self.update_values(dataset.json_configurable_hourly)
         self.async_write_ha_state()
 
@@ -180,23 +177,23 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         reading = json_data["data"][-1]
         self._state = reading["C"]
         partials = {s: reading[s] for s in ["S1", "S2", "S3"] if reading[s] is not None}
-        self.params = {"date": reading["Date"], **partials}
-        self.tariff = tariff
+        self._params = {"date": reading["Date"], **partials}
+        self._tariff = tariff
 
     def update_values(self, json_data):
         total, tariff, zones, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
         self._state = total
-        self.tariff = tariff
-        self.params = {**zones, "data_range": data_range}
-        self.params = {k: v for k, v in self.params.items() if v is not None}
+        self._tariff = tariff
+        self._params = {**zones, "data_range": data_range}
+        self._params = {k: v for k, v in self._params.items() if v is not None}
 
     def update_balanced_data(self, balanced_data, tariff):
         con = balanced_data[0]
         gen = balanced_data[1]
         balance, sum_consumption, sum_generation, zones, data_range = TauronAmiplusSensor.get_balanced_data(con, gen)
         self._state = round(balance, 3)
-        self.tariff = tariff
-        self.params = {
+        self._tariff = tariff
+        self._params = {
             "sum_consumption": round(sum_consumption, 3),
             "sum_generation": round(sum_generation, 3),
             "data_range": data_range,
@@ -253,23 +250,24 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     @property
     def unique_id(self):
         """Return a unique ID."""
-        return f"tauron-yaml-{self.meter_id}-{self.sensor_type.lower()}"
+        return f"tauron-yaml-{self._meter_id}-{self._sensor_type.lower()}"
 
 
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
-    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name, meter_id, sensor_type, tariff):
+    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
+                 state_class: SensorStateClass, tariff: str):
         """Initialize the sensor."""
-        super().__init__(coordinator, name, meter_id, sensor_type)
+        super().__init__(coordinator, name, meter_id, sensor_type, state_class)
         self._tariff = tariff
 
     @property
     def device_info(self):
         return {
-            "identifiers": {(DOMAIN, self.meter_id)},
-            "name": f"{DEFAULT_NAME} {self.meter_id}",
+            "identifiers": {(DOMAIN, self._meter_id)},
+            "name": f"{DEFAULT_NAME} {self._meter_id}",
             "manufacturer": "TAURON",
-            "model": self.meter_id,
+            "model": self._meter_id,
             "sw_version": f"Tariff {self._tariff}",
             "via_device": None,
             "configuration_url": CONST_URL_SERVICE,
@@ -277,9 +275,9 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
     @property
     def name(self):
-        return f"{DEFAULT_NAME} {self.meter_id} {self.client_name}"
+        return f"{DEFAULT_NAME} {self._meter_id} {self._client_name}"
 
     @property
     def unique_id(self):
         """Return a unique ID."""
-        return f"tauron-{self.meter_id}-{self.sensor_type.lower()}"
+        return f"tauron-{self._meter_id}-{self._sensor_type.lower()}"

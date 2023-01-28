@@ -1,6 +1,8 @@
 """Constants for tauron."""
 from datetime import timedelta
 
+from homeassistant.components.sensor import SensorStateClass
+
 DOMAIN = "tauron_amiplus"
 STATISTICS_DOMAIN = "tauron_importer"
 DEFAULT_NAME = "Tauron AMIplus"
@@ -50,53 +52,69 @@ DEFAULT_UPDATE_INTERVAL = timedelta(hours=8, minutes=30)
 SENSOR_TYPES_YAML = {
     TYPE_CONSUMPTION_READING: {
         "name": "Current consumption reading",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_CONSUMPTION_DAILY: {
         "name": "Daily energy consumption",
+        "state_class": SensorStateClass.MEASUREMENT,
     },
     TYPE_CONSUMPTION_MONTHLY: {
         "name": "Monthly energy consumption",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_CONSUMPTION_YEARLY: {
         "name": "Yearly energy consumption",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_CONSUMPTION_LAST_12_MONTHS: {
         "name": "Last 12 months energy consumption",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_GENERATION_READING: {
         "name": "Current generation reading",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_GENERATION_DAILY: {
         "name": "Daily energy generation",
+        "state_class": SensorStateClass.MEASUREMENT,
     },
     TYPE_GENERATION_MONTHLY: {
         "name": "Monthly energy generation",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_GENERATION_YEARLY: {
         "name": "Yearly energy generation",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_GENERATION_LAST_12_MONTHS: {
         "name": "Last 12 months energy generation",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_BALANCED_DAILY: {
-        "name": "Daily balance"
+        "name": "Daily balance",
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_BALANCED_MONTHLY: {
-        "name": "Monthly balance"
+        "name": "Monthly balance",
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_BALANCED_LAST_12_MONTHS: {
         "name": "Last 12 months balance",
+        "state_class": SensorStateClass.TOTAL,
     },
 }
 SENSOR_TYPES = {
     **SENSOR_TYPES_YAML,
     TYPE_CONSUMPTION_CONFIGURABLE: {
         "name": "Configurable energy consumption",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_GENERATION_CONFIGURABLE: {
         "name": "Configurable energy generation",
+        "state_class": SensorStateClass.TOTAL_INCREASING,
     },
     TYPE_BALANCED_CONFIGURABLE: {
         "name": "Configurable balance",
+        "state_class": SensorStateClass.TOTAL,
     },
 }
