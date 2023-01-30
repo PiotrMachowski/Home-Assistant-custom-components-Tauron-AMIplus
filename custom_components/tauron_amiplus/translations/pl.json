@@ -11,7 +11,7 @@
           "show_generation_sensors": "Włącz pobieranie energii oddanej",
           "show_balanced_sensors": "Włącz obliczanie bilansowania godzinnego",
           "show_12_months_sensors": "Włącz sensory zakresu 12 miesięcy",
-          "show_configurable_sensors": "Włącz konfugurowalne sensory",
+          "show_configurable_sensors": "Włącz konfigurowalne sensory",
           "show_configurable_sensors_date": "Początek okresu dla sensorów konfigurowalnych"
         }
       },
