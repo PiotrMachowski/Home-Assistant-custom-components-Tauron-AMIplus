@@ -7,7 +7,7 @@ from homeassistant.components.recorder.statistics import (async_add_external_sta
                                                           statistics_during_period)
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.core import HomeAssistant
-from homeassistant.util.dt import get_time_zone
+from homeassistant.util.dt import get_time_zone, utc_from_timestamp
 
 from .connector import TauronAmiplusConnector, TauronAmiplusRawData
 from .const import CONST_BALANCED, CONST_CONSUMPTION, CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN
@@ -59,7 +59,10 @@ class TauronAmiplusStatisticsUpdater:
             if v["has_stats"]:
                 stat = await self.get_stats(raw_data[v["data_source"]], s)
                 v["sum"] = stat[s][0]["sum"]
-                v["last_stats_time"] = stat[s][0]["start"]
+                start = stat[s][0]["start"]
+                if isinstance(start, float):
+                    start = utc_from_timestamp(start)
+                v["last_stats_time"] = start
 
         for s, v in all_stat_ids.items():
             await self.update_stats(s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data[v["data_source"]])
