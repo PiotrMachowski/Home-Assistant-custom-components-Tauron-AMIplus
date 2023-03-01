@@ -56,7 +56,7 @@ SENSOR_TYPES_YAML = {
     },
     TYPE_CONSUMPTION_DAILY: {
         "name": "Daily energy consumption",
-        "state_class": SensorStateClass.MEASUREMENT,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_CONSUMPTION_MONTHLY: {
         "name": "Monthly energy consumption",
@@ -76,7 +76,7 @@ SENSOR_TYPES_YAML = {
     },
     TYPE_GENERATION_DAILY: {
         "name": "Daily energy generation",
-        "state_class": SensorStateClass.MEASUREMENT,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_GENERATION_MONTHLY: {
         "name": "Monthly energy generation",
