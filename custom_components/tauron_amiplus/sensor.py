@@ -208,7 +208,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         data_range = None
         if len(json_data["data"]["zones"]) > 0:
             zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
-        if len(json_data["data"]["allData"]) > 0 and "Date" in json_data["data"]["allData"][0]:
+        if "allData" in json_data["data"] and len(json_data["data"]["allData"]) > 0 and "Date" in \
+                json_data["data"]["allData"][0]:
             consumption_data = json_data["data"]["allData"]
             data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
         return total, tariff, zones, data_range
