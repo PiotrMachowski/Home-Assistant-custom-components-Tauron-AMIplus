@@ -204,7 +204,7 @@ class TauronAmiplusConnector:
 
     def get_raw_values_daily(self, days_before, generation):
         day = datetime.datetime.now() - datetime.timedelta(days_before)
-        return self.get_raw_values_daily_for_range(day, day, generation), TauronAmiplusConnector.format_date(day)
+        return self.get_raw_values_daily_for_day(day, generation), TauronAmiplusConnector.format_date(day)
 
     def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
@@ -240,6 +240,8 @@ class TauronAmiplusConnector:
                     else:
                         data["data"]["zones"][z] = v
 
+        if len(data["data"]["allData"]) == 0:
+            return None
         return data
 
     def get_raw_values_daily_for_day(self, day, generation):
