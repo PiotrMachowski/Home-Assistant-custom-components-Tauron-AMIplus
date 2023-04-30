@@ -141,30 +141,42 @@ class TauronAmiplusConnector:
         }
         session = requests.session()
         session.mount("https://", TLSAdapter())
+        self.log("Logging in...")
         session.request(
             "POST",
             CONST_URL_LOGIN,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
-        session.request(
+        r2 = session.request(
             "POST",
             CONST_URL_LOGIN,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
+        if "Login lub hasło są nieprawidłowe." in r2.text:
+            self.log("Invalid credentials")
+            raise Exception("Invalid credentials")
+        if self.username not in r2.text:
+            self.log("Failed to login")
+            raise Exception("Failed to login")
+        self.log("Logged in.")
         payload_select_meter = {"site[client]": self.meter_id}
+        self.log(f"Selecting meter: {self.meter_id}")
         session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         self.session = session
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
+        self.log("Calculating configuration...")
         json_data, _ = self.get_raw_values_daily(days_before, generation=False)
         if json_data is None:
+            self.log("Failed to calculate configuration")
             if throw_on_empty:
                 raise Exception("Failed to login")
             else:
                 return None
         tariff = json_data["data"]["tariff"]
+        self.log(f"Calculated configuration: {tariff}")
         return tariff
 
     def get_values_yearly(self, generation):
@@ -177,7 +189,13 @@ class TauronAmiplusConnector:
             "profile": "year",
             "type": "oze" if generation else "consum",
         }
-        return self.get_chart_values(payload)
+        self.log(f"Downloading yearly data for year: {now.year}, generation: {generation}")
+        values = self.get_chart_values(payload)
+        if values is not None:
+            self.log(f"Downloaded yearly data for year: {now.year}, generation: {generation}")
+        else:
+            self.log(f"Failed to download yearly data for year: {now.year}, generation: {generation}")
+        return values
 
     def get_values_monthly(self, generation):
         now = datetime.datetime.now()
@@ -191,7 +209,12 @@ class TauronAmiplusConnector:
             "profile": "month",
             "type": "oze" if generation else "consum",
         }
-        return self.get_chart_values(payload)
+        values = self.get_chart_values(payload)
+        if values is not None:
+            self.log(f"Downloaded monthly data for month: {now.year}.{now.month}, generation: {generation}")
+        else:
+            self.log(f"Failed to download monthly data for month: {now.year}.{now.month}, generation: {generation}")
+        return values
 
     def get_values_daily(self, generation):
         offset = 1
@@ -248,6 +271,7 @@ class TauronAmiplusConnector:
         day_str = TauronAmiplusConnector.format_date(day)
         cached_data = self._cache.get_value(day, generation)
         if cached_data is not None:
+            self.log(f"Cache hit for day {day_str}, generation: {generation}")
             return cached_data
 
         payload = {
@@ -256,23 +280,33 @@ class TauronAmiplusConnector:
             "profile": "full time",
             "type": "oze" if generation else "consum",
         }
+        self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
         values = self.get_chart_values(payload)
         if values is not None and not any(a is None for a in values['data']['values']):
             self.add_all_data(values, day)
             self._cache.add_value(day, generation, values)
+            self.log(f"Downloaded daily data for day: {day_str}, generation: {generation}")
             return values
+        self.log(f"Failed to download daily data for day: {day_str}, generation: {generation}")
         return None
 
     def get_reading(self, generation):
         date_to = datetime.datetime.now()
         date_from = (date_to - datetime.timedelta(CONST_MAX_LOOKUP_RANGE))
 
+        date_to_str = TauronAmiplusConnector.format_date(date_to)
         payload = {
             "from": TauronAmiplusConnector.format_date(date_from),
-            "to": TauronAmiplusConnector.format_date(date_to),
+            "to": date_to_str,
             "type": "energia-oddana" if generation else "energia-pobrana"
         }
-        return self.execute_post(CONST_URL_READINGS, payload)
+        self.log(f"Downloading readings for date: {date_to_str}, generation: {generation}")
+        post = self.execute_post(CONST_URL_READINGS, payload)
+        if post is not None:
+            self.log(f"Downloaded readings for date: {date_to_str}, generation: {generation}")
+        else:
+            self.log(f"Failed to download readings for date: {date_to_str}, generation: {generation}")
+        return post
 
     def get_chart_values(self, payload):
         return self.execute_post(CONST_URL_ENERGY, payload)
@@ -288,6 +322,9 @@ class TauronAmiplusConnector:
             json_data = response.json()
             return json_data
         return None
+
+    def log(self, msg):
+        _LOGGER.debug(f"[{self.meter_id}]: {msg}")
 
     @staticmethod
     def format_date(date):
@@ -305,12 +342,17 @@ class TauronAmiplusConnector:
     @staticmethod
     def add_all_data(data: dict, date):
         all_datas = []
+        zone = list(data['data']['zonesName'].values())[0]
         for i, v in enumerate(data["data"]["values"]):
+            if len(data['data']['zonesName']) > 0:
+                selected_zones = list(filter(lambda item: item[1][i], data["data"]["chartZones"].items()))
+                if len(selected_zones) > 0:
+                    zone = selected_zones[0][0]
             all_datas.append({
                 "EC": v,
                 "Date": date.strftime("%Y-%m-%d"),
                 "Hour": i + 1,
-                "Zone": next(filter(lambda item: item[1][i], data["data"]["chartZones"].items()))[0]
+                "Zone": zone
             })
 
         data["data"]["allData"] = all_datas
@@ -320,7 +362,7 @@ class DailyDataCache:
     def __init__(self):
         self._consumption_data = dict()
         self._generation_data = dict()
-        self._max_date = None
+        self._max_date = datetime.datetime.now() + datetime.timedelta(days=1)
 
     def __contains__(self, item: Tuple[str, bool]):
         date_str, generation = item
@@ -355,6 +397,7 @@ class DailyDataCache:
 
     def delete_day(self, date: datetime.datetime):
         date_str = self._format_date(date)
+        _LOGGER.debug(f"Deleting data from cache for day: {date_str}")
         if date_str in self._generation_data:
             self._generation_data.pop(date_str)
         if date_str in self._consumption_data:
