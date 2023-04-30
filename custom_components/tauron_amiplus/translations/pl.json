@@ -20,7 +20,7 @@
       }
     },
     "error": {
-      "server_no_connection": "Nie można połączyć się z serwerem TAURON eLicznik.",
+      "server_no_connection": "Nie można połączyć się z serwerem TAURON eLicznik: {error_info}",
       "invalid_meter_id": "Nieprawidłowe ID punktu poboru",
       "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych"
     }

@@ -20,7 +20,7 @@
       }
     },
     "error": {
-      "server_no_connection": "Cannot connect to TAURON eLicznik server.",
+      "server_no_connection": "Cannot connect to TAURON eLicznik server: {error_info}",
       "invalid_meter_id": "Invalid energy meter ID",
       "missing_configurable_start_date": "Missing start date for configurable sensors"
     }
