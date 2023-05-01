@@ -342,7 +342,7 @@ class TauronAmiplusConnector:
     @staticmethod
     def add_all_data(data: dict, date):
         all_datas = []
-        zone = list(data['data']['zonesName'].values())[0]
+        zone = list(data['data']['zonesName'].keys())[0]
         for i, v in enumerate(data["data"]["values"]):
             if len(data['data']['zonesName']) > 0:
                 selected_zones = list(filter(lambda item: item[1][i], data["data"]["chartZones"].items()))
