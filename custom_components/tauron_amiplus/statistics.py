@@ -7,7 +7,7 @@ from homeassistant.components.recorder.statistics import (async_add_external_sta
                                                           statistics_during_period)
 from homeassistant.const import ENERGY_KILO_WATT_HOUR
 from homeassistant.core import HomeAssistant
-from homeassistant.util.dt import get_time_zone, utc_from_timestamp
+from homeassistant.util.dt import get_time_zone, utc_from_timestamp, as_utc
 
 from .connector import TauronAmiplusConnector, TauronAmiplusRawData
 from .const import CONST_BALANCED, CONST_CONSUMPTION, CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN
@@ -37,7 +37,7 @@ class TauronAmiplusStatisticsUpdater:
 
         all_stat_ids = await self.prepare_stats_ids(zones)
 
-        if not all([v["has_stats"] for v in all_stat_ids.values()]):
+        if not all([self.are_stats_up_to_date(v["last_stats_end"]) for v in all_stat_ids.values()]):
             now = datetime.datetime.now()
             start_range = (now - datetime.timedelta(365)).replace(day=1)
             data_consumption = await self.hass.async_add_executor_job(self.connector.get_raw_values_daily_for_range,
@@ -56,7 +56,7 @@ class TauronAmiplusStatisticsUpdater:
             raw_data[f"{CONST_BALANCED}_{CONST_GENERATION}"] = balanced_generation
 
         for s, v in all_stat_ids.items():
-            if v["has_stats"]:
+            if v["last_stats_end"] is not None:
                 stat = await self.get_stats(raw_data[v["data_source"]], s)
                 v["sum"] = stat[s][0]["sum"]
                 start = stat[s][0]["start"]
@@ -113,12 +113,12 @@ class TauronAmiplusStatisticsUpdater:
                 "data_source": s["data"],
                 "sum": 0,
                 "last_stats_time": None,
-                "has_stats": False
+                "last_stats_end": None
             }
             for s in suffixes
         }
         for k, v in all_stat_ids.items():
-            v["has_stats"] = await self.has_stats(k)
+            v["last_stats_end"] = await self.get_last_stats_date(k)
         return all_stat_ids
 
     def get_stats_id(self, suffix):
@@ -126,6 +126,13 @@ class TauronAmiplusStatisticsUpdater:
 
     def get_stats_name(self, suffix):
         return f"{DEFAULT_NAME} {self.meter_id} {suffix}"
+
+    @staticmethod
+    def are_stats_up_to_date(last_stats_end):
+        if last_stats_end is None:
+            return False
+        now = datetime.datetime.now()
+        return (as_utc(now) - last_stats_end).days < 30
 
     @staticmethod
     def prepare_balanced_raw_data(raw_data) -> (dict, dict):
@@ -198,8 +205,14 @@ class TauronAmiplusStatisticsUpdater:
             statistic_data.append(stats)
         async_add_external_statistics(self.hass, metadata, statistic_data)
 
-    async def has_stats(self, statistic_id):
-        return len(await self.get_last_stats(statistic_id)) > 0
+    async def get_last_stats_date(self, statistic_id):
+        last_stats = await self.get_last_stats(statistic_id)
+        if statistic_id in last_stats and len(last_stats[statistic_id]) > 0:
+            end = last_stats[statistic_id][0]["end"]
+            if isinstance(end, float):
+                end = utc_from_timestamp(end)
+            return end
+        return None
 
     async def get_last_stats(self, statistic_id):
         return await get_instance(self.hass).async_add_executor_job(
