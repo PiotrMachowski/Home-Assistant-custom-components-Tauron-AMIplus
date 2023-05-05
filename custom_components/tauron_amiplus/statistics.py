@@ -57,7 +57,7 @@ class TauronAmiplusStatisticsUpdater:
 
         for s, v in all_stat_ids.items():
             if v["last_stats_end"] is not None:
-                stat = await self.get_stats(raw_data[v["data_source"]], s)  # here
+                stat = await self.get_stats(raw_data[v["data_source"]], s)
                 v["sum"] = stat[s][0]["sum"]
                 start = stat[s][0]["start"]
                 if isinstance(start, float):
@@ -222,7 +222,7 @@ class TauronAmiplusStatisticsUpdater:
     async def get_stats(self, raw_data, statistic_id):
         return await get_instance(self.hass).async_add_executor_job(
             statistics_during_period,
-            self.hass, self.get_time(raw_data[0]), None, [statistic_id], "hour", None, {"state", "sum"})  # here
+            self.hass, self.get_time(raw_data[0]), None, [statistic_id], "hour", None, {"state", "sum"})
 
     @staticmethod
     def get_time(raw_hour):
