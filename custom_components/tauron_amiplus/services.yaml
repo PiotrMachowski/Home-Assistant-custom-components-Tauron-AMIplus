@@ -1,0 +1,18 @@
+download_statistics:
+  description: >
+    Downloads statistics for a given meter. Overrides all already downloaded data.
+  fields:
+    device_id:
+      name: Target device
+      description: The device to download statistics for.
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: tauron_amiplus
+    start_date:
+      name: Start date
+      description: Start date of statistics to download.
+      required: true
+      selector:
+        date:

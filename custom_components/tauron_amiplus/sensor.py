@@ -42,7 +42,6 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, show_generation_sensors,
                                                  show_12_months, show_balanced)
-    await coordinator.async_request_refresh()
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
         sensor_type_config = SENSOR_TYPES[variable]
@@ -81,7 +80,6 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors,
                                                  show_12_months, show_balanced, show_configurable,
                                                  show_configurable_date)
-    await coordinator.async_request_refresh()
     for sensor_type, sensor_type_config in sensor_types.items():
         sensors.append(
             TauronAmiplusConfigFlowSensor(

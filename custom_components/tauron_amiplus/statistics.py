@@ -5,12 +5,13 @@ from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models import StatisticMetaData
 from homeassistant.components.recorder.statistics import (async_add_external_statistics, get_last_statistics,
                                                           statistics_during_period)
-from homeassistant.const import ENERGY_KILO_WATT_HOUR
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
 from homeassistant.core import HomeAssistant
-from homeassistant.util.dt import get_time_zone, utc_from_timestamp, as_utc
+from homeassistant.util.dt import as_utc, get_time_zone, utc_from_timestamp
 
 from .connector import TauronAmiplusConnector, TauronAmiplusRawData
-from .const import CONST_BALANCED, CONST_CONSUMPTION, CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN
+from .const import (CONF_METER_ID, CONF_SHOW_BALANCED, CONF_SHOW_GENERATION, CONST_BALANCED, CONST_CONSUMPTION,
+                    CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,7 +26,26 @@ class TauronAmiplusStatisticsUpdater:
         self.show_generation = show_generation
         self.show_balanced = show_balanced
 
-    async def update_all(self, last_data: TauronAmiplusRawData) -> None:
+    @staticmethod
+    async def manually_update(hass, start_date: datetime.date, entry):
+        username = entry.data[CONF_USERNAME]
+        password = entry.data[CONF_PASSWORD]
+        meter_id = entry.data[CONF_METER_ID]
+
+        show_generation = entry.options.get(CONF_SHOW_GENERATION, False)
+        show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
+
+        connector = TauronAmiplusConnector(username, password, meter_id, show_generation=show_generation,
+                                           show_balanced=show_balanced)
+        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, show_generation, show_balanced)
+
+        data = await hass.async_add_executor_job(connector.get_raw_data)
+        start_date = datetime.datetime.combine(start_date,
+                                               datetime.time(tzinfo=datetime.datetime.now().astimezone().tzinfo))
+        if data is not None:
+            await statistics_updater.update_all(data, start_date)
+
+    async def update_all(self, last_data: TauronAmiplusRawData, start_date: datetime.datetime = None) -> None:
         if last_data.consumption is None or last_data.consumption.json_last_30_days_hourly is None:
             return
         raw_data = {CONST_CONSUMPTION: last_data.consumption.json_last_30_days_hourly["data"]["allData"]}
@@ -37,9 +57,13 @@ class TauronAmiplusStatisticsUpdater:
 
         all_stat_ids = await self.prepare_stats_ids(zones)
 
-        if not all([self.are_stats_up_to_date(v["last_stats_end"]) for v in all_stat_ids.values()]):
+        if (start_date is not None
+                or not all([self.are_stats_up_to_date(v["last_stats_end"]) for v in all_stat_ids.values()])):
             now = datetime.datetime.now()
-            start_range = (now - datetime.timedelta(365)).replace(day=1)
+            if start_date is None:
+                start_range = (now - datetime.timedelta(365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            else:
+                start_range = start_date.replace(tzinfo=None)
             data_consumption = await self.hass.async_add_executor_job(self.connector.get_raw_values_daily_for_range,
                                                                       start_range, now, False)
             if data_consumption is not None:
@@ -62,6 +86,9 @@ class TauronAmiplusStatisticsUpdater:
                 start = stat[s][0]["start"]
                 if isinstance(start, float):
                     start = utc_from_timestamp(start)
+                if start_date is not None and start > start_date:
+                    start = None
+                    v["sum"] = 0
                 v["last_stats_time"] = start
 
         for s, v in all_stat_ids.items():
