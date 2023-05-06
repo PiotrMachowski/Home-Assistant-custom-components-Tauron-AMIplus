@@ -55,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     )
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     service = DownloadStatisticsService(hass)
-    await hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
+    hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
     return True
 
 
