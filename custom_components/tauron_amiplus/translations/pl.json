@@ -24,13 +24,13 @@
         "description": "Wybierz dane, które mają być pobrane przez integrację.\nAby ograniczyć użycie zasobów nie włączaj pozycji, które nie są potrzebne.",
         "data": {
           "energy_meter_name": "Nazwa punktu poboru, która ma być wyświetlana w interfejsie",
-          "show_generation_sensors": "Włącz pobieranie danych o energii oddanej",
-          "show_balanced_sensors": "Włącz obliczanie bilansowania godzinnego",
-          "show_balanced_year_sensors": "Włącz obliczanie bilansowania godzinnego dla aktualnego roku",
-          "show_12_months_sensors": "Włącz obliczanie podsumowań dla okresu 12 miesięcy",
-          "show_configurable_sensors": "Włącz obliczanie podsumowań dla okresu o konfigurowalnym początku",
+          "show_generation_sensors": "Pobieranie danych o energii oddanej",
+          "show_balanced_sensors": "Obliczanie bilansowania godzinowego",
+          "show_balanced_year_sensors": "Obliczanie bilansowania godzinowego dla aktualnego roku",
+          "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
+          "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
-          "store_statistics": "Zapisuj godzinowe statystyki (dla panelu Energia)"
+          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
       }
     },
@@ -45,13 +45,13 @@
       "user": {
         "description": "Wybierz dane, które mają być pobrane przez integrację.\nAby ograniczyć użycie zasobów nie włączaj pozycji, które nie są potrzebne.",
         "data": {
-          "show_generation_sensors": "Włącz pobieranie danych o energii oddanej",
-          "show_balanced_sensors": "Włącz obliczanie bilansowania godzinnego",
-          "show_balanced_year_sensors": "Włącz obliczanie bilansowania godzinnego dla aktualnego roku",
-          "show_12_months_sensors": "Włącz obliczanie podsumowań dla okresu 12 miesięcy",
-          "show_configurable_sensors": "Włącz obliczanie podsumowań dla okresu o konfigurowalnym początku",
+          "show_generation_sensors": "Pobieranie danych o energii oddanej",
+          "show_balanced_sensors": "Obliczanie bilansowania godzinowego",
+          "show_balanced_year_sensors": "Obliczanie bilansowania godzinowego dla aktualnego roku",
+          "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
+          "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
-          "store_statistics": "Zapisuj godzinowe statystyki (dla panelu Energia)"
+          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
       }
     },
