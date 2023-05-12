@@ -11,8 +11,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import DATE_STR_FORMAT
 
 from .const import (
-    CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE,
-    CONF_SHOW_GENERATION, CONF_TARIFF, DOMAIN,
+    CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
+    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS, CONF_TARIFF,
+    DOMAIN,
 )
 from .services import DownloadStatisticsService
 
@@ -90,6 +91,26 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
             CONF_SHOW_CONFIGURABLE_DATE: datetime.date.today().strftime(DATE_STR_FORMAT),
         }
         config_entry.version = 2
+        hass.config_entries.async_update_entry(config_entry, data=data, options=options)
+
+    if config_entry.version == 2:
+        data = {
+            CONF_USERNAME: config_entry.data[CONF_USERNAME],
+            CONF_PASSWORD: config_entry.data[CONF_PASSWORD],
+            CONF_METER_ID: config_entry.data[CONF_METER_ID],
+            CONF_TARIFF: config_entry.data[CONF_TARIFF],
+            CONF_METER_NAME: config_entry.data[CONF_METER_ID],
+        }
+        options = {
+            CONF_SHOW_GENERATION: config_entry.options[CONF_SHOW_GENERATION],
+            CONF_SHOW_BALANCED: config_entry.options[CONF_SHOW_BALANCED],
+            CONF_SHOW_BALANCED_YEAR: False,
+            CONF_SHOW_12_MONTHS: config_entry.options[CONF_SHOW_12_MONTHS],
+            CONF_SHOW_CONFIGURABLE: config_entry.options[CONF_SHOW_CONFIGURABLE],
+            CONF_SHOW_CONFIGURABLE_DATE: config_entry.options[CONF_SHOW_CONFIGURABLE_DATE],
+            CONF_STORE_STATISTICS: True,
+        }
+        config_entry.version = 3
         hass.config_entries.async_update_entry(config_entry, data=data, options=options)
 
     _LOGGER.info("Migration to version %s successful", config_entry.version)

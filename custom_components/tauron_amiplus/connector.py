@@ -1,6 +1,7 @@
 """Update coordinator for TAURON sensors."""
 import datetime
 import logging
+import re
 import ssl
 from typing import Optional, Tuple
 
@@ -53,6 +54,13 @@ class TauronAmiplusRawData:
         return self.consumption.json_month_hourly, self.generation.json_month_hourly
 
     @property
+    def balance_yearly(self):
+        if (self.data_unavailable() or self.consumption.json_year_hourly is None or
+                self.generation.json_year_hourly is None):
+            return None
+        return self.consumption.json_year_hourly, self.generation.json_year_hourly
+
+    @property
     def balance_last_12_months_hourly(self):
         if (self.data_unavailable() or
                 self.consumption.json_last_12_months_hourly is None or
@@ -77,6 +85,7 @@ class TauronAmiplusDataSet:
         self.json_monthly = None
         self.json_yearly = None
         self.json_month_hourly = None
+        self.json_year_hourly = None
         self.json_last_30_days_hourly = None
         self.json_last_12_months_hourly = None
         self.json_configurable_hourly = None
@@ -85,13 +94,15 @@ class TauronAmiplusDataSet:
 class TauronAmiplusConnector:
 
     def __init__(self, username, password, meter_id, show_generation=False, show_12_months=False, show_balanced=False,
-                 show_configurable=False, show_configurable_date: datetime.date = None):
+                 show_balanced_yearly=False, show_configurable=False, show_configurable_date: datetime.date = None):
         self.username = username
         self.password = password
         self.meter_id = meter_id
+        self.meters = []
         self.show_generation = show_generation
         self.show_12_months = show_12_months
         self.show_balanced = show_balanced
+        self.show_balanced_yearly = show_balanced_yearly
         self.show_configurable = show_configurable
         self.show_configurable_date = show_configurable_date
         self.session = None
@@ -124,6 +135,11 @@ class TauronAmiplusConnector:
         if self.show_12_months:
             dataset.json_last_12_months_hourly = self.get_values_12_months_hourly(generation)
             cache_max = now.replace(year=now.year - 1) - datetime.timedelta(days=2)
+        if self.show_balanced_yearly:
+            dataset.json_year_hourly = self.get_values_year_hourly(generation)
+            potential_max = now.replace(day=1, month=1)
+            if potential_max < cache_max:
+                cache_max = potential_max
         if self.show_configurable and self.show_configurable_date is not None:
             end = datetime.datetime.now()
             start = datetime.datetime.combine(self.show_configurable_date, end.time())
@@ -161,10 +177,26 @@ class TauronAmiplusConnector:
             self.log("Failed to login")
             raise Exception("Failed to login")
         self.log("Logged in.")
+        self.meters = self._get_meters(r2.text)
         payload_select_meter = {"site[client]": self.meter_id}
         self.log(f"Selecting meter: {self.meter_id}")
         session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         self.session = session
+
+    @staticmethod
+    def _get_meters(text):
+        regex = r".*data-data='{\"type\": \".*\"}'>.*"
+        matches = list(re.finditer(regex, text))
+        meters = []
+        for match in matches:
+            m1 = re.match(r".*value=\"([\d\_]+)\".*", match.group())
+            m2 = re.match(r".*\"}'>(.*)</option>", match.group())
+            if m1 is None or m2 is None:
+                continue
+            meter_id = m1.groups()[0]
+            display_name = m2.groups()[0]
+            meters.append({"meter_id": meter_id, "meter_name": display_name})
+        return meters
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
         self.log("Calculating configuration...")
@@ -232,6 +264,11 @@ class TauronAmiplusConnector:
     def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1)
+        return self.get_raw_values_daily_for_range(start_day, now, generation)
+
+    def get_values_year_hourly(self, generation):
+        now = datetime.datetime.now()
+        start_day = now.replace(day=1, month=1)
         return self.get_raw_values_daily_for_range(start_day, now, generation)
 
     def get_values_last_30_days_hourly(self, generation):
@@ -329,6 +366,14 @@ class TauronAmiplusConnector:
     @staticmethod
     def format_date(date):
         return date.strftime(CONST_DATE_FORMAT)
+
+    @staticmethod
+    def get_available_meters(username, password):
+        connector = TauronAmiplusConnector(username, password, "placeholder")
+        connector.login()
+        if connector.meters is not None and len(connector.meters) > 0:
+            return connector.meters
+        raise Exception("Failed to login")
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):

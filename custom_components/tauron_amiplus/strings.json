@@ -1,22 +1,37 @@
 {
   "config": {
     "step": {
+      "confirm": {
+        "description": "This integration uses unofficial API to get energy usage data from TAURON eLicznik. Do you want to continue?"
+      },
       "init": {
         "title": "Enter the connection parameters to the TAURON eLicznik.",
         "description": "We will add sensors to get energy usage data from TAURON eLicznik.\n\n {error_info} ",
         "data": {
           "username": "Username used to login at eLicznik",
-          "password": "Password used to login at eLicznik",
-          "energy_meter_id": "ID of energy meter",
-          "show_generation_sensors": "Enable generation sensors",
-          "show_balanced_sensors": "Enable balanced sensors",
-          "show_12_months_sensors": "Enable 12 months sensors",
-          "show_configurable_sensors": "Enable configurable sensors",
-          "show_configurable_sensors_date": "Start date for configurable sensors"
+          "password": "Password used to login at eLicznik"
         }
       },
-      "confirm": {
-        "description": "This integration uses unofficial API to get energy usage data from TAURON eLicznik. Do you want to continue?"
+      "select_meter": {
+        "title": "Energy meter",
+        "description": "Choose an energy meter you want to configure\n\n {error_info} ",
+        "data": {
+          "energy_meter_id": "Available energy meters"
+        }
+      },
+      "config_options": {
+        "title": "Configuration",
+        "description": "Select data that should be downloaded by the integration.\nDo not enable entries that aren't necessary to avoid excessive data loading times.\n\n {error_info} ",
+        "data": {
+          "energy_meter_name": "Name of the energy meter that should be used in UI",
+          "show_generation_sensors": "Enable downloading energy generation data",
+          "show_balanced_sensors": "Enable calculating balanced energy usage data",
+          "show_balanced_year_sensors": "Enable calculating balanced energy usage data for current year",
+          "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
+          "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
+          "show_configurable_sensors_date": "Start date for configurable data period",
+          "store_statistics": "Store hourly statistics (for Energy dashboard)"
+        }
       }
     },
     "error": {
@@ -28,12 +43,16 @@
   "options": {
     "step": {
       "user": {
+        "title": "Configuration",
+        "description": "Select data that should be downloaded by the integration.\nDo not enable entries that aren't necessary to avoid excessive data loading times.\n\n {error_info} ",
         "data": {
-          "show_generation_sensors": "Enable generation sensors",
-          "show_balanced_sensors": "Enable balanced sensors",
-          "show_12_months_sensors": "Enable 12 months sensors",
-          "show_configurable_sensors": "Enable configurable sensors",
-          "show_configurable_sensors_date": "Start date for configurable sensors"
+          "show_generation_sensors": "Enable downloading energy generation data",
+          "show_balanced_sensors": "Enable calculating balanced energy usage data",
+          "show_balanced_year_sensors": "Enable calculating balanced energy usage data for current year",
+          "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
+          "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
+          "show_configurable_sensors_date": "Start date for configurable data period",
+          "store_statistics": "Store hourly statistics (for Energy dashboard)"
         }
       }
     },
