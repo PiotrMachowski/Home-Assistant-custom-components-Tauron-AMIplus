@@ -231,6 +231,7 @@ class TauronAmiplusStatisticsUpdater:
             }
             statistic_data.append(stats)
         async_add_external_statistics(self.hass, metadata, statistic_data)
+        self.log(f"Updated {len(statistic_data)} entries for statistic: {statistic_id} ")
 
     async def get_last_stats_date(self, statistic_id):
         last_stats = await self.get_last_stats(statistic_id)
@@ -250,6 +251,9 @@ class TauronAmiplusStatisticsUpdater:
         return await get_instance(self.hass).async_add_executor_job(
             statistics_during_period,
             self.hass, self.get_time(raw_data[0]), None, [statistic_id], "hour", None, {"state", "sum"})
+
+    def log(self, msg):
+        _LOGGER.debug(f"[{self.meter_id}]: {msg}")
 
     @staticmethod
     def get_time(raw_hour):

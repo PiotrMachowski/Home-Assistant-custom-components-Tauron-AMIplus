@@ -14,21 +14,28 @@ _LOGGER = logging.getLogger(__name__)
 class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]):
 
     def __init__(self, hass: HomeAssistant, username, password, meter_id, show_generation=False, show_12_months=False,
-                 show_balanced=False, show_configurable=False, show_configurable_date=False):
+                 show_balanced=False, show_balanced_year=False, show_configurable=False, show_configurable_date=None,
+                 store_statistics=False):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=DEFAULT_UPDATE_INTERVAL)
         self.connector = TauronAmiplusConnector(username, password, meter_id, show_generation, show_12_months,
-                                                show_balanced, show_configurable, show_configurable_date)
+                                                show_balanced, show_balanced_year, show_configurable,
+                                                show_configurable_date)
         self.meter_id = meter_id
         self.show_generation = show_generation
         self.show_12_months = show_12_months
         self.show_balanced = show_balanced
         self.show_configurable = show_configurable
         self.show_configurable_date = show_configurable_date
+        self.store_statistics = store_statistics
 
     async def _async_update_data(self) -> TauronAmiplusRawData:
+        self.log("Starting data update")
         data = await self.hass.async_add_executor_job(self._update)
-        if data is not None:
+        self.log("Downloaded all data")
+        if data is not None and self.store_statistics:
+            self.log("Starting statistics update")
             await self.generate_statistics(data)
+            self.log("Updated all statistics")
         return data
 
     async def generate_statistics(self, data):
@@ -38,3 +45,6 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
 
     def _update(self) -> TauronAmiplusRawData:
         return self.connector.get_raw_data()
+
+    def log(self, msg):
+        _LOGGER.debug(f"[{self.meter_id}]: {msg}")

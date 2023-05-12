@@ -10,8 +10,9 @@ from homeassistant.core import callback
 from homeassistant.helpers.selector import selector
 
 from .connector import TauronAmiplusConnector
-from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE,
-                    CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF, DOMAIN)
+from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
+                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
+                    CONF_TARIFF, DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """TAURON config flow."""
 
-    VERSION = 2
+    VERSION = 3
 
     def __init__(self):
         """Initialize TAURON configuration flow."""
@@ -72,8 +73,10 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_SHOW_GENERATION: user_input.get(CONF_SHOW_GENERATION, False),
                             CONF_SHOW_12_MONTHS: user_input.get(CONF_SHOW_12_MONTHS, False),
                             CONF_SHOW_BALANCED: user_input.get(CONF_SHOW_BALANCED, False),
+                            CONF_SHOW_BALANCED_YEAR: user_input.get(CONF_SHOW_BALANCED_YEAR, False),
                             CONF_SHOW_CONFIGURABLE: user_input.get(CONF_SHOW_CONFIGURABLE, False),
                             CONF_SHOW_CONFIGURABLE_DATE: user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None),
+                            CONF_STORE_STATISTICS: user_input.get(CONF_STORE_STATISTICS, False),
                         }
 
                         """Finish config flow"""
@@ -117,10 +120,14 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                          default=user_input.get(CONF_SHOW_12_MONTHS, vol.UNDEFINED)): bool,
             vol.Required(CONF_SHOW_BALANCED,
                          default=user_input.get(CONF_SHOW_BALANCED, vol.UNDEFINED)): bool,
+            vol.Required(CONF_SHOW_BALANCED_YEAR,
+                         default=user_input.get(CONF_SHOW_BALANCED_YEAR, vol.UNDEFINED)): bool,
             vol.Required(CONF_SHOW_CONFIGURABLE,
                          default=user_input.get(CONF_SHOW_CONFIGURABLE, vol.UNDEFINED)): bool,
             vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
-                         default=user_input.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)): selector({"date": {}})
+                         default=user_input.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)): selector({"date": {}}),
+            vol.Required(CONF_STORE_STATISTICS,
+                         default=user_input.get(CONF_STORE_STATISTICS, vol.UNDEFINED)): bool,
         })
         return data_schema
 
@@ -168,12 +175,18 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Required(CONF_SHOW_BALANCED,
                                  default=self.get_option(CONF_SHOW_BALANCED, False)
                                  ): bool,
+                    vol.Required(CONF_SHOW_BALANCED_YEAR,
+                                 default=self.get_option(CONF_SHOW_BALANCED_YEAR, False)
+                                 ): bool,
                     vol.Required(CONF_SHOW_CONFIGURABLE,
                                  default=self.get_option(CONF_SHOW_CONFIGURABLE, False)
                                  ): bool,
                     vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
                                  default=self.get_option(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)
-                                 ): selector({"date": {}})
+                                 ): selector({"date": {}}),
+                    vol.Required(CONF_STORE_STATISTICS,
+                                 default=self.get_option(CONF_STORE_STATISTICS, False)
+                                 ): bool,
                 }
             ),
             errors=errors

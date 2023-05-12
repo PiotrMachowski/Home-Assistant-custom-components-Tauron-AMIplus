@@ -11,9 +11,11 @@ CONF_METER_ID = "energy_meter_id"
 CONF_TARIFF = "tariff"
 CONF_SHOW_GENERATION = "show_generation_sensors"
 CONF_SHOW_BALANCED = "show_balanced_sensors"
+CONF_SHOW_BALANCED_YEAR = "show_balanced_year_sensors"
 CONF_SHOW_12_MONTHS = "show_12_months_sensors"
 CONF_SHOW_CONFIGURABLE = "show_configurable_sensors"
 CONF_SHOW_CONFIGURABLE_DATE = "show_configurable_sensors_date"
+CONF_STORE_STATISTICS = "store_statistics"
 CONST_DATE_FORMAT = "%d.%m.%Y"
 CONST_MAX_LOOKUP_RANGE = 7
 CONST_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"
@@ -33,6 +35,7 @@ CONST_LAST_12_MONTHS = "last_12_months"
 CONST_CONFIGURABLE = "configurable"
 TYPE_BALANCED_DAILY = f"{CONST_BALANCED}_{CONST_DAILY}"
 TYPE_BALANCED_MONTHLY = f"{CONST_BALANCED}_{CONST_MONTHLY}"
+TYPE_BALANCED_YEARLY = f"{CONST_BALANCED}_{CONST_YEARLY}"
 TYPE_BALANCED_LAST_12_MONTHS = f"{CONST_BALANCED}_{CONST_LAST_12_MONTHS}"
 TYPE_BALANCED_CONFIGURABLE = f"{CONST_BALANCED}_{CONST_CONFIGURABLE}"
 TYPE_CONSUMPTION_READING = f"{CONST_CONSUMPTION}_{CONST_READING}"
@@ -96,6 +99,10 @@ SENSOR_TYPES_YAML = {
     },
     TYPE_BALANCED_MONTHLY: {
         "name": "Monthly balance",
+        "state_class": SensorStateClass.TOTAL,
+    },
+    TYPE_BALANCED_YEARLY: {
+        "name": "Yearly balance",
         "state_class": SensorStateClass.TOTAL,
     },
     TYPE_BALANCED_LAST_12_MONTHS: {

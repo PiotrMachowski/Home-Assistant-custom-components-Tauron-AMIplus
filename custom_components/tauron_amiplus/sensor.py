@@ -10,12 +10,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.dt import parse_date
 
 from .connector import TauronAmiplusRawData
-from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_CONFIGURABLE,
-                    CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE,
-                    CONST_DAILY, CONST_GENERATION, CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING,
-                    CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML,
-                    TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY, TYPE_BALANCED_LAST_12_MONTHS,
-                    TYPE_BALANCED_MONTHLY)
+from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
+                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
+                    CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
+                    CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
+                    DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY,
+                    TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,9 +39,14 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     show_generation_sensors = any(filter(lambda v: CONST_GENERATION in v, config[CONF_MONITORED_VARIABLES]))
     show_12_months = any(filter(lambda v: CONST_LAST_12_MONTHS in v, config[CONF_MONITORED_VARIABLES]))
     show_balanced = any(filter(lambda v: CONST_BALANCED in v, config[CONF_MONITORED_VARIABLES]))
+    show_balanced_year = CONF_SHOW_BALANCED_YEAR in config[CONF_MONITORED_VARIABLES]
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, show_generation_sensors,
-                                                 show_12_months, show_balanced)
+    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id,
+                                                 show_generation=show_generation_sensors,
+                                                 show_12_months=show_12_months,
+                                                 show_balanced=show_balanced,
+                                                 show_balanced_year=show_balanced_year,
+                                                 store_statistics=True)
     dev = []
     for variable in config[CONF_MONITORED_VARIABLES]:
         sensor_type_config = SENSOR_TYPES[variable]
@@ -59,8 +64,10 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     show_generation_sensors = entry.options.get(CONF_SHOW_GENERATION, False)
     show_12_months = entry.options.get(CONF_SHOW_12_MONTHS, False)
     show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
+    show_balanced_year = entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
     show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+    store_statistics = entry.options.get(CONF_STORE_STATISTICS, False)
     if show_configurable_date is not None:
         show_configurable_date = parse_date(show_configurable_date)
     else:
@@ -70,16 +77,25 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     sensor_types = {**SENSOR_TYPES}
     if not show_generation_sensors:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.startswith(CONST_GENERATION)}
+    if not show_balanced_year:
+        sensor_types = {k: v for k, v in sensor_types.items() if not k == TYPE_BALANCED_YEARLY}
     if not show_balanced:
-        sensor_types = {k: v for k, v in sensor_types.items() if not k.startswith(CONST_BALANCED)}
+        sensor_types = {
+            k: v for k, v in sensor_types.items() if (not k.startswith(CONST_BALANCED)) or k.endswith(CONST_YEARLY)
+        }
     if not show_12_months:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_LAST_12_MONTHS)}
     if not show_configurable:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, show_generation_sensors,
-                                                 show_12_months, show_balanced, show_configurable,
-                                                 show_configurable_date)
+    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id,
+                                                 show_generation=show_generation_sensors,
+                                                 show_12_months=show_12_months,
+                                                 show_balanced=show_balanced,
+                                                 show_balanced_year=show_balanced_year,
+                                                 show_configurable=show_configurable,
+                                                 show_configurable_date=show_configurable_date,
+                                                 store_statistics=store_statistics)
     for sensor_type, sensor_type_config in sensor_types.items():
         sensors.append(
             TauronAmiplusConfigFlowSensor(
@@ -152,6 +168,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             self.update_balanced_data(data.balance_daily, data.tariff)
         elif self._sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
             self.update_balanced_data(data.balance_monthly, data.tariff)
+        elif self._sensor_type == TYPE_BALANCED_YEARLY and data.balance_yearly is not None:
+            self.update_balanced_data(data.balance_yearly, data.tariff)
         elif self._sensor_type == TYPE_BALANCED_LAST_12_MONTHS and data.balance_last_12_months_hourly is not None:
             self.update_balanced_data(data.balance_last_12_months_hourly, data.tariff)
         elif self._sensor_type == TYPE_BALANCED_CONFIGURABLE and data.balance_configurable_hourly is not None:
@@ -174,7 +192,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     def update_reading(self, json_data, tariff):
         reading = json_data["data"][-1]
         self._state = reading["C"]
-        partials = {s: reading[s] for s in ["S1", "S2", "S3"] if reading[s] is not None}
+        partials = {s: reading[s] for s in ["S1", "S2", "S3"] if s in reading and reading[s] is not None}
         self._params = {"date": reading["Date"], **partials}
         self._tariff = tariff
 

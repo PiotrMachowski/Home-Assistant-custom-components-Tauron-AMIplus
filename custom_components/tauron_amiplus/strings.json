@@ -10,9 +10,11 @@
           "energy_meter_id": "ID of energy meter",
           "show_generation_sensors": "Enable generation sensors",
           "show_balanced_sensors": "Enable balanced sensors",
+          "show_balanced_year_sensors": "Enable balanced sensors for current year",
           "show_12_months_sensors": "Enable 12 months sensors",
           "show_configurable_sensors": "Enable configurable sensors",
-          "show_configurable_sensors_date": "Start date for configurable sensors"
+          "show_configurable_sensors_date": "Start date for configurable sensors",
+          "store_statistics": "Store hourly statistics"
         }
       },
       "confirm": {
@@ -31,9 +33,11 @@
         "data": {
           "show_generation_sensors": "Enable generation sensors",
           "show_balanced_sensors": "Enable balanced sensors",
+          "show_balanced_year_sensors": "Enable balanced sensors for current year",
           "show_12_months_sensors": "Enable 12 months sensors",
           "show_configurable_sensors": "Enable configurable sensors",
-          "show_configurable_sensors_date": "Start date for configurable sensors"
+          "show_configurable_sensors_date": "Start date for configurable sensors",
+          "store_statistics": "Store hourly statistics"
         }
       }
     },
