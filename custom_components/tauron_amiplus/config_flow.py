@@ -277,7 +277,7 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
                                  default=self.get_option(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)
                                  ): selector({"date": {}}),
                     vol.Required(CONF_STORE_STATISTICS,
-                                 default=self.get_option(CONF_STORE_STATISTICS, False)
+                                 default=self.get_option(CONF_STORE_STATISTICS, True)
                                  ): bool,
                 }
             ),
