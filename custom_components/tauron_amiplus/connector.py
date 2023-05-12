@@ -1,6 +1,7 @@
 """Update coordinator for TAURON sensors."""
 import datetime
 import logging
+import re
 import ssl
 from typing import Optional, Tuple
 
@@ -97,6 +98,7 @@ class TauronAmiplusConnector:
         self.username = username
         self.password = password
         self.meter_id = meter_id
+        self.meters = []
         self.show_generation = show_generation
         self.show_12_months = show_12_months
         self.show_balanced = show_balanced
@@ -175,10 +177,26 @@ class TauronAmiplusConnector:
             self.log("Failed to login")
             raise Exception("Failed to login")
         self.log("Logged in.")
+        self.meters = self._get_meters(r2.text)
         payload_select_meter = {"site[client]": self.meter_id}
         self.log(f"Selecting meter: {self.meter_id}")
         session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         self.session = session
+
+    @staticmethod
+    def _get_meters(text):
+        regex = r".*data-data='{\"type\": \".*\"}'>.*"
+        matches = list(re.finditer(regex, text))
+        meters = []
+        for match in matches:
+            m1 = re.match(r".*value=\"([\d\_]+)\".*", match.group())
+            m2 = re.match(r".*\"}'>(.*)</option>", match.group())
+            if m1 is None or m2 is None:
+                continue
+            meter_id = m1.groups()[0]
+            display_name = m2.groups()[0]
+            meters.append({"meter_id": meter_id, "meter_name": display_name})
+        return meters
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
         self.log("Calculating configuration...")
@@ -348,6 +366,14 @@ class TauronAmiplusConnector:
     @staticmethod
     def format_date(date):
         return date.strftime(CONST_DATE_FORMAT)
+
+    @staticmethod
+    def get_available_meters(username, password):
+        connector = TauronAmiplusConnector(username, password, "placeholder")
+        connector.login()
+        if connector.meters is not None and len(connector.meters) > 0:
+            return connector.meters
+        raise Exception("Failed to login")
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):

@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.dt import parse_date
 
 from .connector import TauronAmiplusRawData
-from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
+from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
                     CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
                     CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
                     CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
@@ -59,6 +59,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     user = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     meter_id = entry.data[CONF_METER_ID]
+    meter_name = entry.data[CONF_METER_NAME]
     tariff = entry.data[CONF_TARIFF]
 
     show_generation_sensors = entry.options.get(CONF_SHOW_GENERATION, False)
@@ -104,7 +105,8 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
                 meter_id,
                 sensor_type,
                 sensor_type_config["state_class"],
-                tariff
+                tariff,
+                meter_name
             )
         )
 
@@ -273,16 +275,17 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
     def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
-                 state_class: SensorStateClass, tariff: str):
+                 state_class: SensorStateClass, tariff: str, meter_name: str):
         """Initialize the sensor."""
         super().__init__(coordinator, name, meter_id, sensor_type, state_class)
         self._tariff = tariff
+        self._meter_name = meter_name
 
     @property
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._meter_id)},
-            "name": f"{DEFAULT_NAME} {self._meter_id}",
+            "name": f"{DEFAULT_NAME} {self._meter_name}",
             "manufacturer": "TAURON",
             "model": self._meter_id,
             "sw_version": f"Tariff {self._tariff}",
@@ -292,7 +295,7 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
     @property
     def name(self):
-        return f"{DEFAULT_NAME} {self._meter_id} {self._client_name}"
+        return f"{DEFAULT_NAME} {self._meter_name} {self._client_name}"
 
     @property
     def unique_id(self):

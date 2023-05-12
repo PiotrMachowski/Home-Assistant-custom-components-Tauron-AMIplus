@@ -11,8 +11,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import DATE_STR_FORMAT
 
 from .const import (
-    CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR, CONF_SHOW_CONFIGURABLE,
-    CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS, CONF_TARIFF, DOMAIN,
+    CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
+    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS, CONF_TARIFF,
+    DOMAIN,
 )
 from .services import DownloadStatisticsService
 
@@ -98,6 +99,7 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
             CONF_PASSWORD: config_entry.data[CONF_PASSWORD],
             CONF_METER_ID: config_entry.data[CONF_METER_ID],
             CONF_TARIFF: config_entry.data[CONF_TARIFF],
+            CONF_METER_NAME: config_entry.data[CONF_METER_ID],
         }
         options = {
             CONF_SHOW_GENERATION: config_entry.options[CONF_SHOW_GENERATION],
