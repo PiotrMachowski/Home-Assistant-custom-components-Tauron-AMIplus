@@ -49,33 +49,41 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 
 ### Manual - yaml
 
-| Key | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `name` | `string` | `False` | `Tauron AMIPlus` | Name of sensor |
-| `username` | `string` | `True` | - | Username used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
-| `password` | `string` | `True` | - | Password used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
-| `energy_meter_id` | `string` | `True` | - | ID of energy meter |
-| `monitored_variables` | `list` | `True` | - | List of variables to monitor |
 
-### Possible monitored conditions
+<details>
+<summary>Warning: yaml configuration is not recommended</summary>
 
-| Key | Description |
-| --- | --- | 
-| `consumption_reading` | Current consumption reading of a meter |
-| `consumption_daily` | Daily energy consumption **(for previous day!)** |
-| `consumption_monthly` | Monthly energy consumption |
-| `consumption_yearly` | Yearly energy consumption |
-| `consumption_last_12_months` | Total energy consumption for last 12 months |
-| `generation_reading` | Current generation reading of a meter |
-| `generation_daily` | Daily energy generation **(for previous day!)** |
-| `generation_monthly` | Monthly energy generation |
-| `generation_yearly` | Yearly energy generation |
-| `generation_last_12_months` | Total energy generation for last 12 months |
-| `balanced_daily` | Daily balance **(for previous day!)** |
-| `balanced_monthly` | Monthly balance |
-| `balanced_last_12_months` | Balance for last 12 months |
 
-## Example usage
+**Warning:** Not all features are available when using yaml configuration
+
+| Key                   | Type     | Required | Default          | Description                                                                    |
+|-----------------------|----------|----------|------------------|--------------------------------------------------------------------------------|
+| `name`                | `string` | `False`  | `Tauron AMIPlus` | Name of sensor                                                                 |
+| `username`            | `string` | `True`   | -                | Username used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
+| `password`            | `string` | `True`   | -                | Password used to login at [*eLicznik*](https://elicznik.tauron-dystrybucja.pl) |
+| `energy_meter_id`     | `string` | `True`   | -                | ID of energy meter                                                             |
+| `monitored_variables` | `list`   | `True`   | -                | List of variables to monitor                                                   |
+
+#### Possible monitored conditions
+
+| Key                          | Description                                      |
+|------------------------------|--------------------------------------------------| 
+| `consumption_reading`        | Current consumption reading of a meter           |
+| `consumption_daily`          | Daily energy consumption **(for previous day!)** |
+| `consumption_monthly`        | Monthly energy consumption                       |
+| `consumption_yearly`         | Yearly energy consumption                        |
+| `consumption_last_12_months` | Total energy consumption for last 12 months      |
+| `generation_reading`         | Current generation reading of a meter            |
+| `generation_daily`           | Daily energy generation **(for previous day!)**  |
+| `generation_monthly`         | Monthly energy generation                        |
+| `generation_yearly`          | Yearly energy generation                         |
+| `generation_last_12_months`  | Total energy generation for last 12 months       |
+| `balanced_daily`             | Daily balance **(for previous day!)**            |
+| `balanced_monthly`           | Monthly balance                                  |
+| `balanced_yearly`            | Yearly balance                                   |
+| `balanced_last_12_months`    | Balance for last 12 months                       |
+
+#### Example usage
 
 ```
 sensor:
@@ -97,13 +105,20 @@ sensor:
       - generation_last_12_months
       - balanced_daily
       - balanced_monthly
+      - balanced_yearly
       - balanced_last_12_months
 ```
 
+
+</details>
+
+
 ## Installation
 
-| Since v2.3.0 this integration requires Home Assistant version 2022.12 or latter |
-| --- |
+
+<table><tr><th>Since v2.3.0 this integration requires Home Assistant version 2022.12 or latter</th></tr></table>
+<table><tr><th>Since v2.4.8 this integration might cause slow starts of Home Assistant</th></tr></table>
+
 
 ### Using [HACS](https://hacs.xyz/) (recommended)
 
@@ -129,17 +144,25 @@ Then restart Home Assistant before applying configuration file changes.
 
   To show hourly data in Energy dashboard you have to use `tauron_importer` positions.
 
-* **How to get energy meter id?**
+* **Why there are missing days in statistics/Energy dashboard?**
+
+  Such gaps appear when there are missing values in hourly readings for this day.
+  You can confirm it using [eLicznik website](https://elicznik.tauron-dystrybucja.pl).
   
-  To find out value for `energy_meter_id` log in to [_*eLicznik*_](https://elicznik.tauron-dystrybucja.pl).
-  Desired value is in upper-left corner of page (Punkt poboru - without address).
-  
-* **When does this integration update data from?**
+* **How to fix missing data in statistics/Energy dashboard?**
+
+  Once the data appears on [eLicznik website](https://elicznik.tauron-dystrybucja.pl) can fill such gaps using `tauron_amiplus.download_statistics` service.
+
+* **When does this integration update data?**
 
   This integration logs in and downloads data from eLicznik website every 8.5h.
   This timer is restarted after: HA restart, integration reload, configuration change.
   Additionally, a new pack of data is freshly downloaded when user retrieves diagnostics data.
 
+* **How to get energy meter id?**
+  
+  To find out value for `energy_meter_id` follow [these steps](https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/issues/105#issuecomment-1413675239).
+  
 * **How to calculate available energy as a prosument?**
 
   To calculate available energy you can use following config:
