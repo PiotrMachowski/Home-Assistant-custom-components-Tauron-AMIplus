@@ -181,9 +181,6 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                          default=user_input.get(CONF_USERNAME, vol.UNDEFINED)): str,
             vol.Required(CONF_PASSWORD,
                          default=user_input.get(CONF_PASSWORD, vol.UNDEFINED)): str,
-            vol.Required(CONF_SHOW_GENERATION,
-                         default=False
-                         ): bool,
         })
         return data_schema
 
