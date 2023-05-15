@@ -16,7 +16,8 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
     def __init__(self, hass: HomeAssistant, username, password, meter_id, show_generation=False, show_12_months=False,
                  show_balanced=False, show_balanced_year=False, show_configurable=False, show_configurable_date=None,
                  store_statistics=False):
-        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=DEFAULT_UPDATE_INTERVAL)
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=DEFAULT_UPDATE_INTERVAL,
+                         update_method=self.update_method)
         self.connector = TauronAmiplusConnector(username, password, meter_id, show_generation, show_12_months,
                                                 show_balanced, show_balanced_year, show_configurable,
                                                 show_configurable_date)
@@ -28,7 +29,7 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
         self.show_configurable_date = show_configurable_date
         self.store_statistics = store_statistics
 
-    async def _async_update_data(self) -> TauronAmiplusRawData:
+    async def update_method(self) -> TauronAmiplusRawData:
         self.log("Starting data update")
         data = await self.hass.async_add_executor_job(self._update)
         self.log("Downloaded all data")

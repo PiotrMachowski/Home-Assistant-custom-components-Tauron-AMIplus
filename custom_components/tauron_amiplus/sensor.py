@@ -97,6 +97,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
                                                  show_configurable=show_configurable,
                                                  show_configurable_date=show_configurable_date,
                                                  store_statistics=store_statistics)
+    await coordinator.async_request_refresh()
     for sensor_type, sensor_type_config in sensor_types.items():
         sensors.append(
             TauronAmiplusConfigFlowSensor(
@@ -161,6 +162,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         return self._state_class
 
     def _handle_coordinator_update(self) -> None:
+        self.log(f"Updating data for entry: {self._sensor_type}")
         data: TauronAmiplusRawData = self.coordinator.data
         if not self.available or data is None:
             return
@@ -270,6 +272,9 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     def unique_id(self):
         """Return a unique ID."""
         return f"tauron-yaml-{self._meter_id}-{self._sensor_type.lower()}"
+
+    def log(self, msg):
+        _LOGGER.debug(f"[{self._meter_id}]: {msg}")
 
 
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):

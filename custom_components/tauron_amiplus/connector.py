@@ -106,7 +106,7 @@ class TauronAmiplusConnector:
         self.show_configurable = show_configurable
         self.show_configurable_date = show_configurable_date
         self.session = None
-        self._cache = DailyDataCache()
+        self._cache = DailyDataCache(meter_id)
 
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
@@ -404,10 +404,12 @@ class TauronAmiplusConnector:
 
 
 class DailyDataCache:
-    def __init__(self):
+
+    def __init__(self, meter_id):
         self._consumption_data = dict()
         self._generation_data = dict()
         self._max_date = datetime.datetime.now() + datetime.timedelta(days=1)
+        self._meter_id = meter_id
 
     def __contains__(self, item: Tuple[str, bool]):
         date_str, generation = item
@@ -442,7 +444,7 @@ class DailyDataCache:
 
     def delete_day(self, date: datetime.datetime):
         date_str = self._format_date(date)
-        _LOGGER.debug(f"Deleting data from cache for day: {date_str}")
+        self.log(f"Deleting data from cache for day: {date_str}")
         if date_str in self._generation_data:
             self._generation_data.pop(date_str)
         if date_str in self._consumption_data:
@@ -451,3 +453,6 @@ class DailyDataCache:
     @staticmethod
     def _format_date(date):
         return date.strftime("%Y-%m-%d")
+
+    def log(self, msg):
+        _LOGGER.debug(f"[{self._meter_id}]: {msg}")
