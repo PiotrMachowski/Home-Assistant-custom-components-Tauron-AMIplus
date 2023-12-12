@@ -233,7 +233,7 @@ class TauronAmiplusConnector:
         now = datetime.datetime.now()
         month = now.month
         first_day_of_month = now.replace(day=1)
-        last_day_of_month = first_day_of_month.replace(month=month % 12 + 1) - datetime.timedelta(days=1)
+        last_day_of_month = (first_day_of_month + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
 
         payload = {
             "from": TauronAmiplusConnector.format_date(first_day_of_month),
