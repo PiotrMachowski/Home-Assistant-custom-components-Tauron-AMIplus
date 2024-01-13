@@ -32,7 +32,7 @@ This sensor uses unofficial API to get energy usage and generation data from [*T
 
 To configure this integration go to: _Configuration_ -> _Integrations_ -> _Add integration_ -> _Tauron AMIplus_.
 
-You can also use following [My Home Assistant](http://my.home-assistant.io/) link
+You can also use following [My Home Assistant](http://my.home-assistant.io/) link:
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=tauron_amiplus)
 

@@ -21,7 +21,7 @@
       },
       "config_options": {
         "title": "Configuration",
-        "description": "Select data that should be downloaded by the integration.\nDo not enable entries that aren't necessary to avoid excessive data loading times.\n\n {error_info} ",
+        "description": "Select data that should be downloaded by the integration.\nDo not enable entries that aren't necessary to avoid excessive data loading times.",
         "data": {
           "energy_meter_name": "Name of the energy meter that should be used in UI",
           "show_generation_sensors": "Enable downloading energy generation data",
@@ -44,7 +44,7 @@
     "step": {
       "user": {
         "title": "Configuration",
-        "description": "Select data that should be downloaded by the integration.\nDo not enable entries that aren't necessary to avoid excessive data loading times.\n\n {error_info} ",
+        "description": "Select data that should be downloaded by the integration.\nDo not enable entries that aren't necessary to avoid excessive data loading times.",
         "data": {
           "show_generation_sensors": "Enable downloading energy generation data",
           "show_balanced_sensors": "Enable calculating balanced energy usage data",
@@ -58,6 +58,22 @@
     },
     "error": {
       "missing_configurable_start_date": "Missing start date for configurable sensors"
+    }
+  },
+  "services": {
+    "download_statistics": {
+      "name": "Download statistics",
+      "description": "Downloads statistics for a given meter. Overrides all already downloaded data.",
+      "fields": {
+        "device_id": {
+          "name": "Target device",
+          "description": "The device to download statistics for."
+        },
+        "start_date": {
+          "name": "Start date",
+          "description": "Start date of statistics to download."
+        }
+      }
     }
   }
 }

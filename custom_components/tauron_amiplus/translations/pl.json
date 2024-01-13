@@ -58,5 +58,21 @@
     "error": {
       "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych"
     }
+  },
+  "services": {
+    "download_statistics": {
+      "name": "Pobierz statystyki",
+      "description": "Pobiera dane historyczne dla wybranego urządzenia nadpisując wszystkie dotychczas pobrane wartości.",
+      "fields": {
+        "device_id": {
+          "name": "Docelowe urządzenie",
+          "description": "Urządzenie dla którego będą pobrane statystyki."
+        },
+        "start_date": {
+          "name": "Data początkowa.",
+          "description": "Data od której będą pobrane statystyki."
+        }
+      }
+    }
   }
 }

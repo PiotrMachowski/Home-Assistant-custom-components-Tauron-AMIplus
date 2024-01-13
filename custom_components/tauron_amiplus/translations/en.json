@@ -59,5 +59,21 @@
     "error": {
       "missing_configurable_start_date": "Missing start date for configurable sensors"
     }
+  },
+  "services": {
+    "download_statistics": {
+      "name": "Download statistics",
+      "description": "Downloads statistics for a given meter. Overrides all already downloaded data.",
+      "fields": {
+        "device_id": {
+          "name": "Target device",
+          "description": "The device to download statistics for."
+        },
+        "start_date": {
+          "name": "Start date",
+          "description": "Start date of statistics to download."
+        }
+      }
+    }
   }
 }
