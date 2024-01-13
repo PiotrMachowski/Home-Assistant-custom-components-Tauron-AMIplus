@@ -5,7 +5,7 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
+from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.dt import parse_date
 
@@ -140,7 +140,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             return "zł"
         elif self._sensor_type == TYPE_AMOUNT_STATUS:
             return None
-        return ENERGY_KILO_WATT_HOUR
+        return UnitOfEnergy.KILO_WATT_HOUR
 
     @property
     def device_class(self):
