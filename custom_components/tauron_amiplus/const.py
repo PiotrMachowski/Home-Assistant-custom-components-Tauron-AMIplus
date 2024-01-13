@@ -21,9 +21,12 @@ CONST_DATE_FORMAT = "%d.%m.%Y"
 CONST_MAX_LOOKUP_RANGE = 7
 CONST_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"
 CONST_URL_SERVICE = "https://elicznik.tauron-dystrybucja.pl"
+CONST_URL_LOGIN_MOJ_TAURON = "https://logowanie.tauron.pl/login"
+CONST_URL_SERVICE_MOJ_TAURON = "https://moj.tauron.pl"
 CONST_URL_SELECT_METER = f"{CONST_URL_SERVICE}/ustaw_punkt"
 CONST_URL_ENERGY = f"{CONST_URL_SERVICE}/energia/api"
 CONST_URL_READINGS = f"{CONST_URL_SERVICE}/odczyty/api"
+CONST_URL_ENERGY_BUSINESS = f"{CONST_URL_SERVICE}/energia/wo/api"
 CONST_REQUEST_HEADERS = {"cache-control": "no-cache"}
 CONST_CONSUMPTION = "consumption"
 CONST_GENERATION = "generation"
@@ -51,6 +54,9 @@ TYPE_GENERATION_MONTHLY = f"{CONST_GENERATION}_{CONST_MONTHLY}"
 TYPE_GENERATION_YEARLY = f"{CONST_GENERATION}_{CONST_YEARLY}"
 TYPE_GENERATION_LAST_12_MONTHS = f"{CONST_GENERATION}_{CONST_LAST_12_MONTHS}"
 TYPE_GENERATION_CONFIGURABLE = f"{CONST_GENERATION}_{CONST_CONFIGURABLE}"
+TYPE_AMOUNT = "moj_tauron"
+TYPE_AMOUNT_VALUE = f"{TYPE_AMOUNT}_VALUE"
+TYPE_AMOUNT_STATUS = f"{TYPE_AMOUNT}_STATUS"
 
 DEFAULT_UPDATE_INTERVAL = timedelta(hours=8, minutes=30)
 SENSOR_TYPES_YAML = {
@@ -64,19 +70,19 @@ SENSOR_TYPES_YAML = {
     },
     TYPE_CONSUMPTION_MONTHLY: {
         "name": "Monthly energy consumption",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_CONSUMPTION_YEARLY: {
         "name": "Yearly energy consumption",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_CONSUMPTION_LAST_12_MONTHS: {
         "name": "Last 12 months energy consumption",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_GENERATION_READING: {
         "name": "Current generation reading",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_GENERATION_DAILY: {
         "name": "Daily energy generation",
@@ -84,15 +90,15 @@ SENSOR_TYPES_YAML = {
     },
     TYPE_GENERATION_MONTHLY: {
         "name": "Monthly energy generation",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_GENERATION_YEARLY: {
         "name": "Yearly energy generation",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_GENERATION_LAST_12_MONTHS: {
         "name": "Last 12 months energy generation",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_BALANCED_DAILY: {
         "name": "Daily balance",
@@ -115,14 +121,22 @@ SENSOR_TYPES = {
     **SENSOR_TYPES_YAML,
     TYPE_CONSUMPTION_CONFIGURABLE: {
         "name": "Configurable energy consumption",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_GENERATION_CONFIGURABLE: {
         "name": "Configurable energy generation",
-        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "state_class": SensorStateClass.TOTAL,
     },
     TYPE_BALANCED_CONFIGURABLE: {
         "name": "Configurable balance",
         "state_class": SensorStateClass.TOTAL,
     },
+    # TYPE_AMOUNT_VALUE: {
+    #     "name": "Account balance",
+    #     "state_class": SensorStateClass.MEASUREMENT,
+    # },
+    # TYPE_AMOUNT_STATUS: {
+    #     "name": "Account status",
+    #     "state_class": None,
+    # },
 }

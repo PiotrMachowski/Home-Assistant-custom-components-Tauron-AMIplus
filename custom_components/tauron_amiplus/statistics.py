@@ -10,19 +10,20 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import as_utc, get_time_zone, utc_from_timestamp
 
 from .connector import TauronAmiplusConnector, TauronAmiplusRawData
-from .const import (CONF_METER_ID, CONF_SHOW_BALANCED, CONF_SHOW_GENERATION, CONST_BALANCED, CONST_CONSUMPTION,
-                    CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN)
+from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_BALANCED, CONF_SHOW_GENERATION, CONST_BALANCED,
+                    CONST_CONSUMPTION, CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class TauronAmiplusStatisticsUpdater:
 
-    def __init__(self, hass: HomeAssistant, connector: TauronAmiplusConnector, meter_id: str, show_generation: bool,
-                 show_balanced: bool) -> None:
+    def __init__(self, hass: HomeAssistant, connector: TauronAmiplusConnector, meter_id: str, meter_name: str,
+                 show_generation: bool, show_balanced: bool) -> None:
         self.hass = hass
         self.connector = connector
         self.meter_id = meter_id
+        self.meter_name = meter_name
         self.show_generation = show_generation
         self.show_balanced = show_balanced
 
@@ -31,13 +32,14 @@ class TauronAmiplusStatisticsUpdater:
         username = entry.data[CONF_USERNAME]
         password = entry.data[CONF_PASSWORD]
         meter_id = entry.data[CONF_METER_ID]
+        meter_name = entry.data[CONF_METER_NAME]
 
         show_generation = entry.options.get(CONF_SHOW_GENERATION, False)
         show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
 
         connector = TauronAmiplusConnector(username, password, meter_id, show_generation=show_generation,
                                            show_balanced=show_balanced)
-        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, show_generation, show_balanced)
+        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, meter_name, show_generation, show_balanced)
 
         data = await hass.async_add_executor_job(connector.get_raw_data)
         start_date = datetime.datetime.combine(start_date,
@@ -152,7 +154,7 @@ class TauronAmiplusStatisticsUpdater:
         return f"{STATISTICS_DOMAIN}:{self.meter_id}_{suffix}".lower()
 
     def get_stats_name(self, suffix):
-        return f"{DEFAULT_NAME} {self.meter_id} {suffix}"
+        return f"{DEFAULT_NAME} {self.meter_name} {suffix}"
 
     @staticmethod
     def are_stats_up_to_date(last_stats_end):

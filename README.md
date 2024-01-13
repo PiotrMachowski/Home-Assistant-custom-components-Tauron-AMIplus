@@ -1,6 +1,7 @@
 [![HACS Default][hacs_shield]][hacs]
 [![GitHub Latest Release][releases_shield]][latest_release]
-[![GitHub All Releases][downloads_total_shield]][releases]<!-- piotrmachowski_support_badges_start -->
+[![GitHub All Releases][downloads_total_shield]][releases]
+[![Installations][installations_shield]][releases]<!-- piotrmachowski_support_badges_start -->
 [![Ko-Fi][ko_fi_shield]][ko_fi]
 [![buycoffee.to][buycoffee_to_shield]][buycoffee_to]
 [![PayPal.Me][paypal_me_shield]][paypal_me]
@@ -17,6 +18,8 @@
 
 [releases]: https://github.com/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/releases
 [downloads_total_shield]: https://img.shields.io/github/downloads/PiotrMachowski/Home-Assistant-custom-components-Tauron-AMIplus/total
+
+[installations_shield]: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fanalytics.home-assistant.io%2Fcustom_integrations.json&query=%24.tauron_amiplus.total&style=popout&color=41bdf5&label=analytics
 
 
 # Tauron AMIplus sensor
@@ -37,7 +40,7 @@ You can also use following [My Home Assistant](http://my.home-assistant.io/) lin
 
 
 <details>
-<summary>Warning: yaml configuration is not recommended</summary>
+<summary>Warning: yaml configuration is no longer recommended</summary>
 
 
 **Warning:** Not all features are available when using yaml configuration
@@ -108,6 +111,8 @@ sensor:
 
 ### Using [HACS](https://hacs.xyz/) (recommended)
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=PiotrMachowski&repository=Home-Assistant-custom-components-Tauron-AMIplus&category=integration)
+
 * In _Integrations_ section add repository "Tauron AMIplus"
 * Install added repository
  
@@ -128,7 +133,7 @@ Then restart Home Assistant before applying configuration file changes.
 
 * **How to display hourly data in Energy dashboard?**
 
-  To show hourly data in Energy dashboard you have to use `tauron_importer` positions.
+  To show hourly data in Energy dashboard you have to use `tauron_importer` statistics instead of entities.
 
 * **Why there are missing days in statistics/Energy dashboard?**
 

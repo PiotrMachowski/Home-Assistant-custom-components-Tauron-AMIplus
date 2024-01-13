@@ -13,15 +13,16 @@ _LOGGER = logging.getLogger(__name__)
 
 class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]):
 
-    def __init__(self, hass: HomeAssistant, username, password, meter_id, show_generation=False, show_12_months=False,
-                 show_balanced=False, show_balanced_year=False, show_configurable=False, show_configurable_date=None,
-                 store_statistics=False):
+    def __init__(self, hass: HomeAssistant, username, password, meter_id, meter_name: str, show_generation=False,
+                 show_12_months=False, show_balanced=False, show_balanced_year=False, show_configurable=False,
+                 show_configurable_date=None, store_statistics=False):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=DEFAULT_UPDATE_INTERVAL,
                          update_method=self.update_method)
         self.connector = TauronAmiplusConnector(username, password, meter_id, show_generation, show_12_months,
                                                 show_balanced, show_balanced_year, show_configurable,
                                                 show_configurable_date)
         self.meter_id = meter_id
+        self.meter_name = meter_name
         self.show_generation = show_generation
         self.show_12_months = show_12_months
         self.show_balanced = show_balanced
@@ -40,7 +41,7 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
         return data
 
     async def generate_statistics(self, data):
-        statistics_updater = TauronAmiplusStatisticsUpdater(self.hass, self.connector, self.meter_id,
+        statistics_updater = TauronAmiplusStatisticsUpdater(self.hass, self.connector, self.meter_id, self.meter_name,
                                                             self.show_generation, self.show_balanced)
         await statistics_updater.update_all(data)
 

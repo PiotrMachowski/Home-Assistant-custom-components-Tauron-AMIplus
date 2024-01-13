@@ -15,7 +15,8 @@ from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SH
                     CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
                     CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
                     DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY,
-                    TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY)
+                    TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY,
+                    TYPE_AMOUNT, TYPE_AMOUNT_STATUS, TYPE_AMOUNT_VALUE)
 from .coordinator import TauronAmiplusUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     show_balanced = any(filter(lambda v: CONST_BALANCED in v, config[CONF_MONITORED_VARIABLES]))
     show_balanced_year = CONF_SHOW_BALANCED_YEAR in config[CONF_MONITORED_VARIABLES]
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id,
+    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, name,
                                                  show_generation=show_generation_sensors,
                                                  show_12_months=show_12_months,
                                                  show_balanced=show_balanced,
@@ -89,7 +90,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     if not show_configurable:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id,
+    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, meter_name,
                                                  show_generation=show_generation_sensors,
                                                  show_12_months=show_12_months,
                                                  show_balanced=show_balanced,
@@ -135,10 +136,16 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
     @property
     def native_unit_of_measurement(self):
+        if self._sensor_type == TYPE_AMOUNT_VALUE:
+            return "zł"
+        elif self._sensor_type == TYPE_AMOUNT_STATUS:
+            return None
         return ENERGY_KILO_WATT_HOUR
 
     @property
     def device_class(self):
+        if self._sensor_type.startswith(TYPE_AMOUNT):
+            return None
         return SensorDeviceClass.ENERGY
 
     @property
@@ -168,7 +175,13 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             return
         dataset = data.generation if self._generation else data.consumption
 
-        if self._sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
+        if self._sensor_type == TYPE_AMOUNT_VALUE and data.amount_value is not None:
+            self._state = data.amount_value
+            self._params = {"status": data.amount_status}
+        elif self._sensor_type == TYPE_AMOUNT_STATUS and data.amount_status is not None:
+            self._state = data.amount_status
+            self._params = {"value": data.amount_value}
+        elif self._sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
             self.update_balanced_data(data.balance_daily, data.tariff)
         elif self._sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
             self.update_balanced_data(data.balance_monthly, data.tariff)
@@ -223,13 +236,24 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     @staticmethod
     def get_data_from_json(json_data):
         total = round(json_data["data"]["sum"], 3)
-        tariff = json_data["data"]["tariff"]
+        if "tariff" in json_data["data"]:
+            tariff = json_data["data"]["tariff"]
+        else:
+            tariff = "tariff"
         zones = {}
         data_range = None
-        if len(json_data["data"]["zones"]) > 0:
+        if (
+            "zones" in json_data["data"]
+            and len(json_data["data"]["zones"]) > 0
+            and "zonesName" in json_data["data"]
+            and len(json_data["data"]["zonesName"]) > 0
+        ):
             zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
-        if "allData" in json_data["data"] and len(json_data["data"]["allData"]) > 0 and "Date" in \
-                json_data["data"]["allData"][0]:
+        if (
+            "allData" in json_data["data"]
+            and len(json_data["data"]["allData"]) > 0
+            and "Date" in json_data["data"]["allData"][0]
+        ):
             consumption_data = json_data["data"]["allData"]
             data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
         return total, tariff, zones, data_range

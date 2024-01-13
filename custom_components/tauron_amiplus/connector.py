@@ -1,16 +1,17 @@
 """Update coordinator for TAURON sensors."""
 import datetime
 import logging
-import re
 import ssl
+import re
 from typing import Optional, Tuple
 
 import requests
-from requests import adapters
+from requests import adapters, Response, Session
 from urllib3 import poolmanager
 
-from .const import (CONST_DATE_FORMAT, CONST_MAX_LOOKUP_RANGE, CONST_REQUEST_HEADERS, CONST_URL_ENERGY, CONST_URL_LOGIN,
-                    CONST_URL_READINGS, CONST_URL_SELECT_METER, CONST_URL_SERVICE)
+from .const import (CONST_DATE_FORMAT, CONST_MAX_LOOKUP_RANGE, CONST_REQUEST_HEADERS, CONST_URL_ENERGY,
+                    CONST_URL_ENERGY_BUSINESS, CONST_URL_LOGIN, CONST_URL_LOGIN_MOJ_TAURON, CONST_URL_READINGS,
+                    CONST_URL_SELECT_METER, CONST_URL_SERVICE, CONST_URL_SERVICE_MOJ_TAURON)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +37,8 @@ class TauronAmiplusRawData:
         self.tariff = None
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
+        self.amount_value: Optional[float] = None
+        self.amount_status: Optional[str] = None
 
     def data_unavailable(self):
         return self.consumption is None or self.generation is None
@@ -98,6 +101,7 @@ class TauronAmiplusConnector:
         self.username = username
         self.password = password
         self.meter_id = meter_id
+        self.is_business = False
         self.meters = []
         self.show_generation = show_generation
         self.show_12_months = show_12_months
@@ -110,6 +114,9 @@ class TauronAmiplusConnector:
 
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
+        # amount_value, amount_status = self.get_moj_tauron()
+        # data.amount_value = amount_value
+        # data.amount_status = amount_status
         self.login()
         generation_max_cache = datetime.datetime.now()
         data.consumption, consumption_max_cache = self.get_data_set(generation=False)
@@ -117,7 +124,7 @@ class TauronAmiplusConnector:
             data.generation, generation_max_cache = self.get_data_set(generation=True)
         else:
             data.generation = TauronAmiplusDataSet()
-        if data.consumption.json_yearly is not None:
+        if data.consumption.json_yearly is not None and "tariff" in data.consumption.json_yearly["data"]:
             data.tariff = data.consumption.json_yearly["data"]["tariff"]
         self._cache.delete_older_than(min(consumption_max_cache, generation_max_cache))
         return data
@@ -149,53 +156,70 @@ class TauronAmiplusConnector:
                 cache_max = potential_max
         return dataset, cache_max
 
-    def login(self):
+    def login_service(self, login_url: str, service: str) -> tuple[Session, Response]:
         payload_login = {
             "username": self.username,
             "password": self.password,
-            "service": CONST_URL_SERVICE,
+            "service": service,
         }
         session = requests.session()
         session.mount("https://", TLSAdapter())
-        self.log("Logging in...")
-        session.request(
+        self.log(f"Logging in... ({service})")
+        r1 = session.request(
             "POST",
-            CONST_URL_LOGIN,
+            login_url,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
+        if "Przekroczono maksymalną liczbę logowań." in r1.text:
+            self.log("Too many login attempts")
+            raise Exception("Too many login attempts")
         r2 = session.request(
             "POST",
-            CONST_URL_LOGIN,
+            login_url,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
+        if "Przekroczono maksymalną liczbę logowań." in r2.text:
+            self.log("Too many login attempts")
+            raise Exception("Too many login attempts")
         if "Login lub hasło są nieprawidłowe." in r2.text:
             self.log("Invalid credentials")
             raise Exception("Invalid credentials")
-        if self.username not in r2.text:
+        if (self.username not in r2.text) and (self.username.upper() not in r2.text):
             self.log("Failed to login")
             raise Exception("Failed to login")
-        self.log("Logged in.")
-        self.meters = self._get_meters(r2.text)
-        payload_select_meter = {"site[client]": self.meter_id}
-        self.log(f"Selecting meter: {self.meter_id}")
-        session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        return session, r2
+
+    def login(self):
+        session, login_response = self.login_service(CONST_URL_LOGIN, CONST_URL_SERVICE)
         self.session = session
+        self.log("Logged in.")
+        self.meters = self._get_meters(login_response.text)
+        payload_select_meter = {"site[client]": self.meter_id}
+        selected_meter_info = list(filter(lambda m: m["meter_id"] == self.meter_id, self.meters))
+        if len(selected_meter_info) > 0:
+            self.is_business = selected_meter_info[0]["meter_type"] == "WO"
+        else:
+            self.is_business = False
+        self.log(f"Selecting meter: {self.meter_id}")
+        self.session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
 
     @staticmethod
-    def _get_meters(text):
+    def _get_meters(text: str) -> list:
         regex = r".*data-data='{\"type\": \".*\"}'>.*"
         matches = list(re.finditer(regex, text))
         meters = []
         for match in matches:
             m1 = re.match(r".*value=\"([\d\_]+)\".*", match.group())
             m2 = re.match(r".*\"}'>(.*)</option>", match.group())
-            if m1 is None or m2 is None:
+            m3 = re.match(r".*data-data='{\"type\": \"(.*)\"}'>.*", match.group())
+            if m1 is None or m2 is None or m3 is None:
                 continue
             meter_id = m1.groups()[0]
             display_name = m2.groups()[0]
-            meters.append({"meter_id": meter_id, "meter_name": display_name})
+            meter_type = m3.groups()[0]
+            meters.append({"meter_id": meter_id, "meter_name": display_name, "meter_type": meter_type})
         return meters
 
     def calculate_configuration(self, days_before=2, throw_on_empty=True):
@@ -204,10 +228,13 @@ class TauronAmiplusConnector:
         if json_data is None:
             self.log("Failed to calculate configuration")
             if throw_on_empty:
-                raise Exception("Failed to login")
+                raise Exception("Failed to calculate configuration")
             else:
                 return None
-        tariff = json_data["data"]["tariff"]
+        if "tariff" in json_data["data"]:
+            tariff = json_data["data"]["tariff"]
+        else:
+            tariff = "tariff"
         self.log(f"Calculated configuration: {tariff}")
         return tariff
 
@@ -220,6 +247,7 @@ class TauronAmiplusConnector:
             "to": TauronAmiplusConnector.format_date(last_day_of_year),
             "profile": "year",
             "type": "oze" if generation else "consum",
+            "energy": 2 if generation else 1,
         }
         self.log(f"Downloading yearly data for year: {now.year}, generation: {generation}")
         values = self.get_chart_values(payload)
@@ -240,6 +268,7 @@ class TauronAmiplusConnector:
             "to": TauronAmiplusConnector.format_date(last_day_of_month),
             "profile": "month",
             "type": "oze" if generation else "consum",
+            "energy": 2 if generation else 1,
         }
         values = self.get_chart_values(payload)
         if values is not None:
@@ -293,7 +322,8 @@ class TauronAmiplusConnector:
                 data["data"]["allData"].extend(day_data["data"]["allData"])
                 data["data"]["sum"] += day_data["data"]["sum"]
                 data["data"]["zonesName"] = day_data["data"]["zonesName"]
-                data["data"]["tariff"] = day_data["data"]["tariff"]
+                if "tariff" in day_data["data"]:
+                    data["data"]["tariff"] = day_data["data"]["tariff"]
                 for z, v in day_data["data"]["zones"].items():
                     if z in data["data"]["zones"]:
                         data["data"]["zones"][z] += v
@@ -316,6 +346,7 @@ class TauronAmiplusConnector:
             "to": day_str,
             "profile": "full time",
             "type": "oze" if generation else "consum",
+            "energy": 2 if generation else 1,
         }
         self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
         values = self.get_chart_values(payload)
@@ -346,15 +377,20 @@ class TauronAmiplusConnector:
         return post
 
     def get_chart_values(self, payload):
-        return self.execute_post(CONST_URL_ENERGY, payload)
+        return self.execute_post(CONST_URL_ENERGY_BUSINESS if self.is_business else CONST_URL_ENERGY, payload)
 
     def execute_post(self, url, payload):
+        self.log(f"EXECUTING: {url} with payload: {payload}")
         response = self.session.request(
             "POST",
             url,
             data=payload,
             headers=CONST_REQUEST_HEADERS,
         )
+        self.log(f"RESPONSE: {response.text}")
+        if "Przekroczono maksymalną liczbę logowań." in response.text:
+            self.log("Too many login attempts")
+            raise Exception("Too many login attempts")
         if response.status_code == 200 and response.text.startswith('{"success":true'):
             json_data = response.json()
             return json_data
@@ -362,6 +398,41 @@ class TauronAmiplusConnector:
 
     def log(self, msg):
         _LOGGER.debug(f"[{self.meter_id}]: {msg}")
+
+    def get_moj_tauron(self):
+        session, response = self.login_service(CONST_URL_LOGIN_MOJ_TAURON, CONST_URL_SERVICE_MOJ_TAURON)
+
+        if response is None:
+            return None, "unknown"
+        find_1_1 = re.findall(r".*class=\"amount-value\".*", response.text)
+        find_2_1 = re.findall(r".*class=\"amount-status\".*", response.text)
+        if len(find_1_1) > 0 and len(find_2_1) > 0:
+            amount_value = float(
+                find_1_1[0].strip()
+                .replace("<span class=\"amount-value\">", "")
+                .replace("zł", "")
+                .replace("</span>", "")
+                .replace(",", ".").strip())
+            amount_status = (find_2_1[0].strip()
+                             .replace("<span class=\"amount-status\">", "")
+                             .replace("</span>", "").strip())
+            return amount_value, amount_status
+
+        find_1_2 = re.findall(r".*class=\"amount\".*\s*.*\s*</div>", response.text)
+        find_2_2 = re.findall(r".*class=\"date\".*", response.text)
+        if len(find_1_2) > 0 and len(find_2_2) > 0:
+            amount_value = float(
+                find_1_2[0].strip()
+                .replace("<div class=\"amount\">", "")
+                .replace("zł", "")
+                .replace("</div>", "")
+                .replace(",", ".").strip())
+            amount_status = (find_2_2[0].strip()
+                             .replace("<div class=\"date\">", "")
+                             .replace("</div>", "").strip())
+            return amount_value, amount_status
+
+        return None, "unknown"
 
     @staticmethod
     def format_date(date):
@@ -373,7 +444,7 @@ class TauronAmiplusConnector:
         connector.login()
         if connector.meters is not None and len(connector.meters) > 0:
             return connector.meters
-        raise Exception("Failed to login")
+        raise Exception("Failed to retrieve energy meters")
 
     @staticmethod
     def calculate_tariff(username, password, meter_id):
@@ -382,7 +453,7 @@ class TauronAmiplusConnector:
         config = connector.calculate_configuration()
         if config is not None:
             return config
-        raise Exception("Failed to login")
+        raise Exception("Failed to calculate configuration")
 
     @staticmethod
     def add_all_data(data: dict, date):
