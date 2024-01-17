@@ -117,15 +117,13 @@ class TauronAmiplusConnector:
         # amount_value, amount_status = self.get_moj_tauron()
         # data.amount_value = amount_value
         # data.amount_status = amount_status
-        self.login()
+        data.tariff = self.login()
         generation_max_cache = datetime.datetime.now()
         data.consumption, consumption_max_cache = self.get_data_set(generation=False)
         if self.show_generation or self.show_balanced:
             data.generation, generation_max_cache = self.get_data_set(generation=True)
         else:
             data.generation = TauronAmiplusDataSet()
-        if data.consumption.json_yearly is not None and "tariff" in data.consumption.json_yearly["data"]:
-            data.tariff = data.consumption.json_yearly["data"]["tariff"]
         self._cache.delete_older_than(min(consumption_max_cache, generation_max_cache))
         return data
 
@@ -203,7 +201,12 @@ class TauronAmiplusConnector:
         else:
             self.is_business = False
         self.log(f"Selecting meter: {self.meter_id}")
-        self.session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        select_response = self.session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response.text)
+        if len(tariff_search) > 0:
+            tariff = tariff_search[0]
+            return tariff
+        return "unknown"
 
     @staticmethod
     def _get_meters(text: str) -> list:
@@ -449,10 +452,10 @@ class TauronAmiplusConnector:
     @staticmethod
     def calculate_tariff(username, password, meter_id):
         connector = TauronAmiplusConnector(username, password, meter_id)
-        connector.login()
+        tariff = connector.login()
         config = connector.calculate_configuration()
         if config is not None:
-            return config
+            return tariff
         raise Exception("Failed to calculate configuration")
 
     @staticmethod

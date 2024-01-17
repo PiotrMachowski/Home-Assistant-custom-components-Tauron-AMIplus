@@ -174,6 +174,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         if not self.available or data is None:
             return
         dataset = data.generation if self._generation else data.consumption
+        self._tariff = data.tariff
 
         if self._sensor_type == TYPE_AMOUNT_VALUE and data.amount_value is not None:
             self._state = data.amount_value
@@ -182,17 +183,17 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             self._state = data.amount_status
             self._params = {"value": data.amount_value}
         elif self._sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
-            self.update_balanced_data(data.balance_daily, data.tariff)
+            self.update_balanced_data(data.balance_daily)
         elif self._sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:
-            self.update_balanced_data(data.balance_monthly, data.tariff)
+            self.update_balanced_data(data.balance_monthly)
         elif self._sensor_type == TYPE_BALANCED_YEARLY and data.balance_yearly is not None:
-            self.update_balanced_data(data.balance_yearly, data.tariff)
+            self.update_balanced_data(data.balance_yearly)
         elif self._sensor_type == TYPE_BALANCED_LAST_12_MONTHS and data.balance_last_12_months_hourly is not None:
-            self.update_balanced_data(data.balance_last_12_months_hourly, data.tariff)
+            self.update_balanced_data(data.balance_last_12_months_hourly)
         elif self._sensor_type == TYPE_BALANCED_CONFIGURABLE and data.balance_configurable_hourly is not None:
-            self.update_balanced_data(data.balance_configurable_hourly, data.tariff)
+            self.update_balanced_data(data.balance_configurable_hourly)
         elif self._sensor_type.endswith(CONST_READING) and dataset.json_reading is not None:
-            self.update_reading(dataset.json_reading, data.tariff)
+            self.update_reading(dataset.json_reading)
         elif self._sensor_type.endswith(CONST_DAILY) and dataset.json_daily is not None:
             self.update_values(dataset.json_daily)
             self._params = {"date": dataset.daily_date, **self._params}
@@ -206,26 +207,23 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             self.update_values(dataset.json_configurable_hourly)
         self.async_write_ha_state()
 
-    def update_reading(self, json_data, tariff):
+    def update_reading(self, json_data):
         reading = json_data["data"][-1]
         self._state = reading["C"]
         partials = {s: reading[s] for s in ["S1", "S2", "S3"] if s in reading and reading[s] is not None}
         self._params = {"date": reading["Date"], **partials}
-        self._tariff = tariff
 
     def update_values(self, json_data):
-        total, tariff, zones, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
+        total, zones, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
         self._state = total
-        self._tariff = tariff
         self._params = {**zones, "data_range": data_range}
         self._params = {k: v for k, v in self._params.items() if v is not None}
 
-    def update_balanced_data(self, balanced_data, tariff):
+    def update_balanced_data(self, balanced_data):
         con = balanced_data[0]
         gen = balanced_data[1]
         balance, sum_consumption, sum_generation, zones, data_range = TauronAmiplusSensor.get_balanced_data(con, gen)
         self._state = round(balance, 3)
-        self._tariff = tariff
         self._params = {
             "sum_consumption": round(sum_consumption, 3),
             "sum_generation": round(sum_generation, 3),
@@ -236,10 +234,6 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     @staticmethod
     def get_data_from_json(json_data):
         total = round(json_data["data"]["sum"], 3)
-        if "tariff" in json_data["data"]:
-            tariff = json_data["data"]["tariff"]
-        else:
-            tariff = "tariff"
         zones = {}
         data_range = None
         if (
@@ -256,7 +250,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         ):
             consumption_data = json_data["data"]["allData"]
             data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
-        return total, tariff, zones, data_range
+        return total, zones, data_range
 
     @staticmethod
     def get_balanced_data(consumption_data_json, generation_data_json):
