@@ -95,18 +95,15 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
             if len(errors) == 0:
                 try:
-                    tariff = None
-                    calculated = await self.hass.async_add_executor_job(
+                    tariff = await self.hass.async_add_executor_job(
                         TauronAmiplusConnector.calculate_tariff, self._username, self._password,
                         user_input[CONF_METER_ID])
-                    if calculated is not None:
-                        tariff = calculated
                     if tariff is not None:
                         self._meter_id = user_input[CONF_METER_ID]
                         self._tariff = tariff
                         return await self.async_step_config_options()
                     errors = {CONF_METER_ID: "server_no_connection"}
-                    description_placeholders = {"error_info": str(calculated)}
+                    description_placeholders = {"error_info": str(tariff)}
                 except Exception as e:
                     errors = {CONF_PASSWORD: "server_no_connection"}
                     description_placeholders = {"error_info": str(e)}

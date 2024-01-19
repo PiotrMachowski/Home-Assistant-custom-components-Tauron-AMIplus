@@ -225,22 +225,6 @@ class TauronAmiplusConnector:
             meters.append({"meter_id": meter_id, "meter_name": display_name, "meter_type": meter_type})
         return meters
 
-    def calculate_configuration(self, days_before=2, throw_on_empty=True):
-        self.log("Calculating configuration...")
-        json_data, _ = self.get_raw_values_daily(days_before, generation=False)
-        if json_data is None:
-            self.log("Failed to calculate configuration")
-            if throw_on_empty:
-                raise Exception("Failed to calculate configuration")
-            else:
-                return None
-        if "tariff" in json_data["data"]:
-            tariff = json_data["data"]["tariff"]
-        else:
-            tariff = "tariff"
-        self.log(f"Calculated configuration: {tariff}")
-        return tariff
-
     def get_values_yearly(self, generation):
         now = datetime.datetime.now()
         first_day_of_year = now.replace(day=1, month=1)
@@ -453,8 +437,7 @@ class TauronAmiplusConnector:
     def calculate_tariff(username, password, meter_id):
         connector = TauronAmiplusConnector(username, password, meter_id)
         tariff = connector.login()
-        config = connector.calculate_configuration()
-        if config is not None:
+        if tariff is not None:
             return tariff
         raise Exception("Failed to calculate configuration")
 
