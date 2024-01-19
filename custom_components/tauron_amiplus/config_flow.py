@@ -95,18 +95,15 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
             if len(errors) == 0:
                 try:
-                    tariff = None
-                    calculated = await self.hass.async_add_executor_job(
+                    tariff = await self.hass.async_add_executor_job(
                         TauronAmiplusConnector.calculate_tariff, self._username, self._password,
                         user_input[CONF_METER_ID])
-                    if calculated is not None:
-                        tariff = calculated
                     if tariff is not None:
                         self._meter_id = user_input[CONF_METER_ID]
                         self._tariff = tariff
                         return await self.async_step_config_options()
                     errors = {CONF_METER_ID: "server_no_connection"}
-                    description_placeholders = {"error_info": str(calculated)}
+                    description_placeholders = {"error_info": str(tariff)}
                 except Exception as e:
                     errors = {CONF_PASSWORD: "server_no_connection"}
                     description_placeholders = {"error_info": str(e)}
@@ -187,7 +184,8 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def get_schema_select_meter(self, user_input=None):
         if user_input is None:
             user_input = {}
-        meter_options = list(map(lambda m: {"label": m["meter_name"], "value": m["meter_id"]}, self._meters))
+        meter_options = list(
+            map(lambda m: {"label": f"({m['meter_type']}) {m['meter_name']}", "value": m["meter_id"]}, self._meters))
         data_schema = vol.Schema({
             vol.Required(CONF_METER_ID,
                          default=user_input.get(CONF_METER_ID, vol.UNDEFINED)): selector(
@@ -227,7 +225,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
-    """Blueprint config flow options handler."""
+    """Tauron Amiplus config flow options handler."""
 
     def __init__(self, config_entry):
         """Initialize HACS options flow."""
