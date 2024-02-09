@@ -5,7 +5,7 @@ from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models import StatisticMetaData
 from homeassistant.components.recorder.statistics import (async_add_external_statistics, get_last_statistics,
                                                           statistics_during_period)
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, ENERGY_KILO_WATT_HOUR
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import as_utc, get_time_zone, utc_from_timestamp
 
@@ -215,7 +215,7 @@ class TauronAmiplusStatisticsUpdater:
             "name": statistic_name,
             "source": STATISTICS_DOMAIN,
             "statistic_id": statistic_id,
-            "unit_of_measurement": ENERGY_KILO_WATT_HOUR
+            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR
         }
         statistic_data = []
         for raw_hour in raw_data:
