@@ -50,9 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
-    )
+    await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     service = DownloadStatisticsService(hass)
     hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
