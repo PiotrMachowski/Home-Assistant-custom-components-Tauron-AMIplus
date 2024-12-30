@@ -2,7 +2,9 @@
 from datetime import timedelta
 
 from homeassistant.components.sensor import SensorStateClass
+from homeassistant.const import Platform
 
+PLATFORMS = [Platform.SENSOR]
 DOMAIN = "tauron_amiplus"
 STATISTICS_DOMAIN = "tauron_importer"
 DEFAULT_NAME = "Tauron AMIplus"

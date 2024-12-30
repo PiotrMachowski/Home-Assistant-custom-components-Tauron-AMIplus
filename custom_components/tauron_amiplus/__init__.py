@@ -13,10 +13,9 @@ from homeassistant.util.dt import DATE_STR_FORMAT
 from .const import (
     CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
     CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS, CONF_TARIFF,
-    DOMAIN,
+    DOMAIN, PLATFORMS,
 )
 from .services import DownloadStatisticsService
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
         hass.data[DOMAIN] = {}
 
     hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
+        hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
     )
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     service = DownloadStatisticsService(hass)
@@ -62,7 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
 
 async def async_unload_entry(hass, config_entry):
     """Unload a config entry."""
-    await hass.config_entries.async_forward_entry_unload(config_entry, "sensor")
+    await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
     return True
 
 
