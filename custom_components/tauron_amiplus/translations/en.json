@@ -6,7 +6,7 @@
       },
       "init": {
         "title": "Enter the connection parameters to the TAURON eLicznik.",
-        "description": "We will add sensors to get energy usage data from TAURON eLicznik.\n\n {error_info} ",
+        "description": "We will add sensors to get energy usage data from TAURON eLicznik.\n\n {error_info}",
         "data": {
           "username": "Username used to login at eLicznik",
           "password": "Password used to login at eLicznik"
@@ -14,7 +14,7 @@
       },
       "select_meter": {
         "title": "Energy meter",
-        "description": "Choose an energy meter you want to configure\n\n {error_info} ",
+        "description": "Choose an energy meter you want to configure\n\n {error_info}",
         "data": {
           "energy_meter_id": "Available energy meters"
         }

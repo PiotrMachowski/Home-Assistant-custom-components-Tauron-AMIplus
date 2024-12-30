@@ -14,7 +14,7 @@
       },
       "select_meter": {
         "title": "Punkt poboru",
-        "description": "Wybierz punkt poboru, który chcesz skonfigurować\n\n {error_info} ",
+        "description": "Wybierz punkt poboru, który chcesz skonfigurować\n\n {error_info}",
         "data": {
           "energy_meter_id": "Dostępne punkty poboru"
         }
