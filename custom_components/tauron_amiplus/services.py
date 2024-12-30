@@ -39,6 +39,6 @@ class DownloadStatisticsService:
             _LOGGER.error(f"Failed to download statistics, date from the future: {start_date}")
             return
         device = device_registry.async_get(call.data["device_id"])
-        [config_entry_id] = device.config_entries
+        [config_entry_id, *_] = device.config_entries
         config_entry = self._hass.config_entries.async_get_entry(config_entry_id)
         await TauronAmiplusStatisticsUpdater.manually_update(self._hass, start_date, config_entry)
