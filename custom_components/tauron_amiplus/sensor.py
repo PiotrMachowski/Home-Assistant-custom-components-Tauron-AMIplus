@@ -242,7 +242,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
             and "zonesName" in json_data["data"]
             and len(json_data["data"]["zonesName"]) > 0
         ):
-            zones = {v: round(json_data["data"]["zones"][k], 3) for (k, v) in json_data["data"]["zonesName"].items()}
+            zones = {v: round(json_data["data"]["zones"].get(k, 0), 3) for (k, v) in json_data["data"]["zonesName"].items()}
         if (
             "allData" in json_data["data"]
             and len(json_data["data"]["allData"]) > 0
