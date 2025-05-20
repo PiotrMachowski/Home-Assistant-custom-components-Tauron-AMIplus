@@ -340,7 +340,7 @@ class TauronAmiplusConnector:
         dnc = datetime.datetime.now() - datetime.timedelta(days=1)
         if values is not None and not any(a is None for a in values['data']['values']):
             self.add_all_data(values, day)
-            if (day.date() < dnc.date()):
+            if day.date() < dnc.date():
                 self._cache.add_value(day, generation, values)
             self.log(f"Downloaded daily data for day: {day_str}, generation: {generation}")
             return values
