@@ -148,7 +148,7 @@ class TauronAmiplusConnector:
         if self.show_configurable and self.show_configurable_date is not None:
             end = datetime.datetime.now()
             start = datetime.datetime.combine(self.show_configurable_date, end.time())
-            dataset.json_configurable_hourly = self.get_raw_values_daily_for_range(start, end, generation)
+            dataset.json_configurable_hourly = self.get_raw_values_daily_for_range(start, end - datetime.timedelta(days=1), generation)
             potential_max = end - datetime.timedelta(days=2)
             if potential_max < cache_max:
                 cache_max = potential_max
@@ -280,22 +280,22 @@ class TauronAmiplusConnector:
     def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return self.get_raw_values_daily_for_range(start_day, now - datetime.timedelta(days=1), generation)
 
     def get_values_year_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1, month=1)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return self.get_raw_values_daily_for_range(start_day, now - datetime.timedelta(days=1), generation)
 
     def get_values_last_30_days_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now - datetime.timedelta(days=30)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return self.get_raw_values_daily_for_range(start_day, now - datetime.timedelta(days=1), generation)
 
     def get_values_12_months_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(year=now.year - 1)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return self.get_raw_values_daily_for_range(start_day, now - datetime.timedelta(days=1), generation)
 
     def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, generation):
         data = {"data": {
@@ -337,9 +337,11 @@ class TauronAmiplusConnector:
         }
         self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
         values = self.get_chart_values(payload)
+        dnc = datetime.datetime.now() - datetime.timedelta(days=1)
         if values is not None and not any(a is None for a in values['data']['values']):
             self.add_all_data(values, day)
-            self._cache.add_value(day, generation, values)
+            if (day.date() < dnc.date()):
+                self._cache.add_value(day, generation, values)
             self.log(f"Downloaded daily data for day: {day_str}, generation: {generation}")
             return values
         self.log(f"Failed to download daily data for day: {day_str}, generation: {generation}")
