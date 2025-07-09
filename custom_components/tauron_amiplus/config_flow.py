@@ -160,6 +160,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=self.get_schema_config_options(user_input),
                 errors=errors,
                 description_placeholders=description_placeholders,
+                last_step=True
             )
 
         return self.async_show_form(
