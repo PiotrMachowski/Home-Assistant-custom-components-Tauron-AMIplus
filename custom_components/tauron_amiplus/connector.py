@@ -3,6 +3,8 @@ import datetime
 import logging
 import ssl
 import re
+import os
+import pickle
 from typing import Optional, Tuple
 
 import requests
@@ -111,6 +113,8 @@ class TauronAmiplusConnector:
         self.show_configurable_date = show_configurable_date
         self.session = None
         self._cache = DailyDataCache(meter_id)
+        # Add session file path in /config directory
+        self._session_file = os.path.join("/config", f"tauron_session_{self.username}.pkl")
 
     def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
@@ -189,7 +193,101 @@ class TauronAmiplusConnector:
             raise Exception("Failed to login")
         return session, r2
 
+    def _save_session(self):
+        """Save current session to file."""
+        if self.session is None:
+            return
+            
+        session_data = {
+            "cookies": self.session.cookies.get_dict(),
+            "meter_id": self.meter_id,
+            "is_business": self.is_business,
+            "meters": self.meters
+        }
+        
+        try:
+            with open(self._session_file, "wb") as f:
+                pickle.dump(session_data, f)
+            self.log(f"Session saved to {self._session_file}")
+        except Exception as e:
+            self.log(f"Failed to save session: {str(e)}")
+
+    def _load_session(self) -> Optional[Session]:
+        """Load session from file if it exists."""
+        if not os.path.exists(self._session_file):
+            return None
+            
+        try:
+            with open(self._session_file, "rb") as f:
+                session_data = pickle.load(f)
+                
+            # Create new session with stored cookies
+            session = requests.session()
+            session.mount("https://", TLSAdapter())
+            
+            # Restore cookies
+            for name, value in session_data.get("cookies", {}).items():
+                session.cookies.set(name, value)
+                
+            # Restore other session data
+            self.is_business = session_data.get("is_business", False)
+            self.meters = session_data.get("meters", [])
+            
+            self.log("Session loaded from file")
+            return session
+        except Exception as e:
+            self.log(f"Failed to load session: {str(e)}")
+            # Remove corrupted session file
+            try:
+                os.remove(self._session_file)
+            except:
+                pass
+            return None
+
+    def _is_session_valid(self, session: Session) -> bool:
+        """Check if the loaded session is still valid by making a simple request."""
+        try:
+            # Make a simple request to check if session is still valid
+            response = session.get(
+                CONST_URL_SELECT_METER,
+                headers=CONST_REQUEST_HEADERS,
+                timeout=10
+            )
+            
+            # Check if we're still logged in
+            if response.status_code == 200 and (self.username in response.text or self.username.upper() in response.text):
+                self.log("Session is valid")
+                return True
+                
+            self.log("Session is invalid")
+            return False
+        except Exception as e:
+            self.log(f"Error checking session validity: {str(e)}")
+            return False
+
     def login(self):
+        """Login with session persistence."""
+        # Try to load existing session
+        loaded_session = self._load_session()
+        
+        if loaded_session and self._is_session_valid(loaded_session):
+            self.session = loaded_session
+            self.log("Using existing session")
+            
+            # If we don't have tariff info yet, get it
+            payload_select_meter = {"site[client]": self.meter_id}
+            select_response = self.session.request(
+                "POST", 
+                CONST_URL_SELECT_METER, 
+                data=payload_select_meter, 
+                headers=CONST_REQUEST_HEADERS
+            )
+            tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response.text)
+            if len(tariff_search) > 0:
+                return tariff_search[0]
+            return "unknown"
+        
+        # If no valid session, perform normal login
         session, login_response = self.login_service(CONST_URL_LOGIN, CONST_URL_SERVICE)
         self.session = session
         self.log("Logged in.")
@@ -203,6 +301,10 @@ class TauronAmiplusConnector:
         self.log(f"Selecting meter: {self.meter_id}")
         select_response = self.session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response.text)
+        
+        # Save the new session
+        self._save_session()
+        
         if len(tariff_search) > 0:
             tariff = tariff_search[0]
             return tariff
@@ -387,6 +489,7 @@ class TauronAmiplusConnector:
         _LOGGER.debug(f"[{self.meter_id}]: {msg}")
 
     def get_moj_tauron(self):
+        # For moj_tauron we need a separate session as it's a different service
         session, response = self.login_service(CONST_URL_LOGIN_MOJ_TAURON, CONST_URL_SERVICE_MOJ_TAURON)
 
         if response is None:
