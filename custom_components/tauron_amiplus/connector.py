@@ -337,9 +337,14 @@ class TauronAmiplusConnector:
         }
         self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
         values = self.get_chart_values(payload)
-        if values is not None and not any(a is None or a == 0 for a in values['data']['values']):
-            self.add_all_data(values, day)
-            self._cache.add_value(day, generation, values)
+        if values is not None:
+            if values['data']['allData'] is None or any(a is None for a in values['data']['allData']):
+                self.add_all_data(values, day)
+            else:
+                for i, v in enumerate(values['data']['allData']):
+                    v['Date'] = day.strftime("%Y-%m-%d")
+            if all(a.get("Status") is not None for a in values['data']['allData']):
+                self._cache.add_value(day, generation, values)
             self.log(f"Downloaded daily data for day: {day_str}, generation: {generation}")
             return values
         self.log(f"Failed to download daily data for day: {day_str}, generation: {generation}")
