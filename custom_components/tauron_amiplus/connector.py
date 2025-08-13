@@ -219,7 +219,7 @@ class TauronAmiplusConnector:
         store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
         stored_data = await store.async_load()
         if stored_data is None:
-            return False, None
+            return False, None, session
         cookies = {k: v for k, v in stored_data.get("cookies", {}).items() if k in ["PHPSESSID", "ASP.NET_SessionId"]}
         self.log(f"COOKIES ({service}): {cookies}")
         session.cookie_jar.clear(lambda x: True)
