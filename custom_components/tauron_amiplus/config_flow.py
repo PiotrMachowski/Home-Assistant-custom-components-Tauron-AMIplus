@@ -10,9 +10,19 @@ from homeassistant.core import callback
 from homeassistant.helpers.selector import selector
 
 from .connector import TauronAmiplusConnector
-from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
-                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
-                    CONF_TARIFF, DOMAIN)
+from .const import (
+    CONF_METER_ID,
+    CONF_METER_NAME,
+    CONF_SHOW_12_MONTHS,
+    CONF_SHOW_BALANCED,
+    CONF_SHOW_BALANCED_YEAR,
+    CONF_SHOW_CONFIGURABLE,
+    CONF_SHOW_CONFIGURABLE_DATE,
+    CONF_SHOW_GENERATION,
+    CONF_STORE_STATISTICS,
+    CONF_TARIFF,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +41,6 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self._meter_id = None
 
     async def async_step_import(self, import_config):
-        # pass
         return self.async_abort(reason="single_instance_allowed")
 
     async def async_step_user(self, user_input=None):
@@ -55,9 +64,9 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             if len(errors) == 0:
                 try:
                     self._meters = []
-                    calculated = await self.hass.async_add_executor_job(
-                        TauronAmiplusConnector.get_available_meters, user_input[CONF_USERNAME],
-                        user_input[CONF_PASSWORD])
+                    calculated = await TauronAmiplusConnector.get_available_meters(
+                        user_input[CONF_USERNAME], user_input[CONF_PASSWORD], self.hass
+                    )
                     if calculated is not None:
                         self._username = user_input[CONF_USERNAME]
                         self._password = user_input[CONF_PASSWORD]
@@ -95,9 +104,12 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
             if len(errors) == 0:
                 try:
-                    tariff = await self.hass.async_add_executor_job(
-                        TauronAmiplusConnector.calculate_tariff, self._username, self._password,
-                        user_input[CONF_METER_ID])
+                    tariff = await TauronAmiplusConnector.calculate_tariff(
+                        self._username,
+                        self._password,
+                        user_input[CONF_METER_ID],
+                        self.hass,
+                    )
                     if tariff is not None:
                         self._meter_id = user_input[CONF_METER_ID]
                         self._tariff = tariff
@@ -127,10 +139,14 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle a flow start."""
         errors = {}
         description_placeholders = {"error_info": ""}
-        selected_meter_name = list(filter(lambda m: m["meter_id"] == self._meter_id, self._meters))
+        selected_meter_name = list(
+            filter(lambda m: m["meter_id"] == self._meter_id, self._meters)
+        )
         if user_input is not None:
-            if (user_input.get(CONF_SHOW_CONFIGURABLE, False) is True and
-                    user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None):
+            if (
+                user_input.get(CONF_SHOW_CONFIGURABLE, False) is True
+                and user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None
+            ):
                 errors[CONF_SHOW_CONFIGURABLE_DATE] = "missing_configurable_start_date"
 
             if len(errors) == 0 and len(selected_meter_name) == 1:
@@ -139,28 +155,40 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_PASSWORD: self._password,
                     CONF_METER_ID: self._meter_id,
                     CONF_TARIFF: self._tariff,
-                    CONF_METER_NAME: user_input.get(CONF_METER_NAME, selected_meter_name[0]["meter_name"].split(" ")[0])
+                    CONF_METER_NAME: user_input.get(
+                        CONF_METER_NAME,
+                        selected_meter_name[0]["meter_name"].split(" ")[0],
+                    ),
                 }
                 options = {
                     CONF_SHOW_GENERATION: user_input.get(CONF_SHOW_GENERATION, False),
                     CONF_SHOW_12_MONTHS: user_input.get(CONF_SHOW_12_MONTHS, False),
                     CONF_SHOW_BALANCED: user_input.get(CONF_SHOW_BALANCED, False),
-                    CONF_SHOW_BALANCED_YEAR: user_input.get(CONF_SHOW_BALANCED_YEAR, False),
-                    CONF_SHOW_CONFIGURABLE: user_input.get(CONF_SHOW_CONFIGURABLE, False),
-                    CONF_SHOW_CONFIGURABLE_DATE: user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None),
+                    CONF_SHOW_BALANCED_YEAR: user_input.get(
+                        CONF_SHOW_BALANCED_YEAR, False
+                    ),
+                    CONF_SHOW_CONFIGURABLE: user_input.get(
+                        CONF_SHOW_CONFIGURABLE, False
+                    ),
+                    CONF_SHOW_CONFIGURABLE_DATE: user_input.get(
+                        CONF_SHOW_CONFIGURABLE_DATE, None
+                    ),
                     CONF_STORE_STATISTICS: user_input.get(CONF_STORE_STATISTICS, True),
                 }
 
                 """Finish config flow"""
-                return self.async_create_entry(title=f"eLicznik {user_input[CONF_METER_NAME]}", data=data,
-                                               options=options)
+                return self.async_create_entry(
+                    title=f"eLicznik {user_input[CONF_METER_NAME]}",
+                    data=data,
+                    options=options,
+                )
 
             return self.async_show_form(
                 step_id="config_options",
                 data_schema=self.get_schema_config_options(user_input),
                 errors=errors,
                 description_placeholders=description_placeholders,
-                last_step=True
+                last_step=True,
             )
 
         return self.async_show_form(
@@ -174,49 +202,81 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def get_schema_init(user_input=None):
         if user_input is None:
             user_input = {}
-        data_schema = vol.Schema({
-            vol.Required(CONF_USERNAME,
-                         default=user_input.get(CONF_USERNAME, vol.UNDEFINED)): str,
-            vol.Required(CONF_PASSWORD,
-                         default=user_input.get(CONF_PASSWORD, vol.UNDEFINED)): str,
-        })
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_USERNAME, default=user_input.get(CONF_USERNAME, vol.UNDEFINED)
+                ): str,
+                vol.Required(
+                    CONF_PASSWORD, default=user_input.get(CONF_PASSWORD, vol.UNDEFINED)
+                ): str,
+            }
+        )
         return data_schema
 
     def get_schema_select_meter(self, user_input=None):
         if user_input is None:
             user_input = {}
         meter_options = list(
-            map(lambda m: {"label": f"({m['meter_type']}) {m['meter_name']}", "value": m["meter_id"]}, self._meters))
-        data_schema = vol.Schema({
-            vol.Required(CONF_METER_ID,
-                         default=user_input.get(CONF_METER_ID, vol.UNDEFINED)): selector(
-                {"select": {"options": meter_options}}),
-        })
+            map(
+                lambda m: {
+                    "label": f"({m['meter_type']}) {m['meter_name']}",
+                    "value": m["meter_id"],
+                },
+                self._meters,
+            )
+        )
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_METER_ID, default=user_input.get(CONF_METER_ID, vol.UNDEFINED)
+                ): selector({"select": {"options": meter_options}}),
+            }
+        )
         return data_schema
 
     def get_schema_config_options(self, user_input=None):
         if user_input is None:
             user_input = {}
         selected_meter_name = next(
-            filter(lambda m: m["meter_id"] == self._meter_id, self._meters))["meter_name"].split(" ")[0]
-        data_schema = vol.Schema({
-            vol.Required(CONF_METER_NAME,
-                         default=user_input.get(CONF_METER_NAME, selected_meter_name)): str,
-            vol.Required(CONF_SHOW_GENERATION,
-                         default=user_input.get(CONF_SHOW_GENERATION, vol.UNDEFINED)): bool,
-            vol.Required(CONF_SHOW_12_MONTHS,
-                         default=user_input.get(CONF_SHOW_12_MONTHS, vol.UNDEFINED)): bool,
-            vol.Required(CONF_SHOW_BALANCED,
-                         default=user_input.get(CONF_SHOW_BALANCED, vol.UNDEFINED)): bool,
-            vol.Required(CONF_SHOW_BALANCED_YEAR,
-                         default=user_input.get(CONF_SHOW_BALANCED_YEAR, vol.UNDEFINED)): bool,
-            vol.Required(CONF_SHOW_CONFIGURABLE,
-                         default=user_input.get(CONF_SHOW_CONFIGURABLE, vol.UNDEFINED)): bool,
-            vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
-                         default=user_input.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)): selector({"date": {}}),
-            vol.Required(CONF_STORE_STATISTICS,
-                         default=user_input.get(CONF_STORE_STATISTICS, True)): bool,
-        })
+            filter(lambda m: m["meter_id"] == self._meter_id, self._meters)
+        )["meter_name"].split(" ")[0]
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_METER_NAME,
+                    default=user_input.get(CONF_METER_NAME, selected_meter_name),
+                ): str,
+                vol.Required(
+                    CONF_SHOW_GENERATION,
+                    default=user_input.get(CONF_SHOW_GENERATION, vol.UNDEFINED),
+                ): bool,
+                vol.Required(
+                    CONF_SHOW_12_MONTHS,
+                    default=user_input.get(CONF_SHOW_12_MONTHS, vol.UNDEFINED),
+                ): bool,
+                vol.Required(
+                    CONF_SHOW_BALANCED,
+                    default=user_input.get(CONF_SHOW_BALANCED, vol.UNDEFINED),
+                ): bool,
+                vol.Required(
+                    CONF_SHOW_BALANCED_YEAR,
+                    default=user_input.get(CONF_SHOW_BALANCED_YEAR, vol.UNDEFINED),
+                ): bool,
+                vol.Required(
+                    CONF_SHOW_CONFIGURABLE,
+                    default=user_input.get(CONF_SHOW_CONFIGURABLE, vol.UNDEFINED),
+                ): bool,
+                vol.Optional(
+                    CONF_SHOW_CONFIGURABLE_DATE,
+                    default=user_input.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED),
+                ): selector({"date": {}}),
+                vol.Required(
+                    CONF_STORE_STATISTICS,
+                    default=user_input.get(CONF_STORE_STATISTICS, True),
+                ): bool,
+            }
+        )
         return data_schema
 
     @staticmethod
@@ -241,8 +301,10 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
         """Handle a flow initialized by the user."""
         errors = {}
         if user_input is not None:
-            if (user_input.get(CONF_SHOW_CONFIGURABLE, False) is True and
-                    user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None):
+            if (
+                user_input.get(CONF_SHOW_CONFIGURABLE, False) is True
+                and user_input.get(CONF_SHOW_CONFIGURABLE_DATE, None) is None
+            ):
                 errors[CONF_SHOW_CONFIGURABLE_DATE] = "missing_configurable_start_date"
             if len(errors) == 0:
                 self.options.update(user_input)
@@ -254,34 +316,47 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SHOW_GENERATION,
-                                 default=self.get_option(CONF_SHOW_GENERATION, False)
-                                 ): bool,
-                    vol.Required(CONF_SHOW_12_MONTHS,
-                                 default=self.get_option(CONF_SHOW_12_MONTHS, False)
-                                 ): bool,
-                    vol.Required(CONF_SHOW_BALANCED,
-                                 default=self.get_option(CONF_SHOW_BALANCED, False)
-                                 ): bool,
-                    vol.Required(CONF_SHOW_BALANCED_YEAR,
-                                 default=self.get_option(CONF_SHOW_BALANCED_YEAR, False)
-                                 ): bool,
-                    vol.Required(CONF_SHOW_CONFIGURABLE,
-                                 default=self.get_option(CONF_SHOW_CONFIGURABLE, False)
-                                 ): bool,
-                    vol.Optional(CONF_SHOW_CONFIGURABLE_DATE,
-                                 default=self.get_option(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED)
-                                 ): selector({"date": {}}),
-                    vol.Required(CONF_STORE_STATISTICS,
-                                 default=self.get_option(CONF_STORE_STATISTICS, True)
-                                 ): bool,
+                    vol.Required(
+                        CONF_SHOW_GENERATION,
+                        default=self.get_option(CONF_SHOW_GENERATION, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_SHOW_12_MONTHS,
+                        default=self.get_option(CONF_SHOW_12_MONTHS, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_SHOW_BALANCED,
+                        default=self.get_option(CONF_SHOW_BALANCED, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_SHOW_BALANCED_YEAR,
+                        default=self.get_option(CONF_SHOW_BALANCED_YEAR, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_SHOW_CONFIGURABLE,
+                        default=self.get_option(CONF_SHOW_CONFIGURABLE, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_SHOW_CONFIGURABLE_DATE,
+                        default=self.get_option(
+                            CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED
+                        ),
+                    ): selector({"date": {}}),
+                    vol.Required(
+                        CONF_STORE_STATISTICS,
+                        default=self.get_option(CONF_STORE_STATISTICS, True),
+                    ): bool,
                 }
             ),
-            errors=errors
+            errors=errors,
         )
 
     def get_option(self, key, default):
-        return self.options.get(key, default) if self.options.get(key, default) is not None else default
+        return (
+            self.options.get(key, default)
+            if self.options.get(key, default) is not None
+            else default
+        )
 
     async def _update_options(self):
         """Update config entry options."""

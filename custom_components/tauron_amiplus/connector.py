@@ -1,35 +1,34 @@
 """Update coordinator for TAURON sensors."""
 import datetime
 import logging
-import ssl
 import re
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
-import requests
-from requests import adapters, Response, Session
-from urllib3 import poolmanager
+from aiohttp import ClientSession
+# from bs4 import BeautifulSoup
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.storage import Store
+from homeassistant.util import slugify
 
-from .const import (CONST_DATE_FORMAT, CONST_MAX_LOOKUP_RANGE, CONST_REQUEST_HEADERS, CONST_URL_ENERGY,
-                    CONST_URL_ENERGY_BUSINESS, CONST_URL_LOGIN, CONST_URL_LOGIN_MOJ_TAURON, CONST_URL_READINGS,
-                    CONST_URL_SELECT_METER, CONST_URL_SERVICE, CONST_URL_SERVICE_MOJ_TAURON)
+from .const import (
+    CONST_DATE_FORMAT,
+    CONST_MAX_LOOKUP_RANGE,
+    CONST_REQUEST_HEADERS,
+    CONST_URL_ENERGY,
+    CONST_URL_ENERGY_BUSINESS,
+    CONST_URL_LOGIN,
+    CONST_URL_LOGIN_MOJ_TAURON,
+    CONST_URL_READINGS,
+    CONST_URL_SELECT_METER,
+    CONST_URL_SERVICE,
+    CONST_URL_SERVICE_MOJ_TAURON,
+    STORAGE_VERSION,
+    STORAGE_KEY_PREFIX,
+)
 
 _LOGGER = logging.getLogger(__name__)
-
-
-# to fix the SSLError
-class TLSAdapter(adapters.HTTPAdapter):
-    def init_poolmanager(self, connections, maxsize, block=False, **kwargs):
-        """Create and initialize the urllib3 PoolManager."""
-        ctx = ssl.create_default_context()
-        ctx.set_ciphers("DEFAULT@SECLEVEL=1")
-        ctx.check_hostname = False
-        self.poolmanager = poolmanager.PoolManager(
-            num_pools=connections,
-            maxsize=maxsize,
-            block=block,
-            ssl_version=ssl.PROTOCOL_TLS,
-            ssl_context=ctx,
-        )
 
 
 class TauronAmiplusRawData:
@@ -37,8 +36,7 @@ class TauronAmiplusRawData:
         self.tariff = None
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
-        self.amount_value: Optional[float] = None
-        self.amount_status: Optional[str] = None
+        self.payments: Optional[list[MojTauronPaymentData]] = None
 
     def data_unavailable(self):
         return self.consumption is None or self.generation is None
@@ -94,115 +92,186 @@ class TauronAmiplusDataSet:
         self.json_configurable_hourly = None
 
 
+@dataclass
+class MojTauronPaymentData:
+    value: float
+    date: str
+
+
 class TauronAmiplusConnector:
 
-    def __init__(self, username, password, meter_id, show_generation=False, show_12_months=False, show_balanced=False,
-                 show_balanced_yearly=False, show_configurable=False, show_configurable_date: datetime.date = None):
-        self.username = username
-        self.password = password
-        self.meter_id = meter_id
-        self.is_business = False
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        meter_id: str,
+        hass: HomeAssistant | None = None,
+        config_entry_id: str = None,
+        show_generation: bool = False,
+        show_12_months: bool = False,
+        show_balanced: bool = False,
+        show_balanced_yearly: bool = False,
+        show_configurable: bool = False,
+        show_configurable_date: datetime.date = None,
+    ):
+        self._username = username
+        self._password = password
+        self._meter_id = meter_id
+        self._is_business = False
         self.meters = []
-        self.show_generation = show_generation
-        self.show_12_months = show_12_months
-        self.show_balanced = show_balanced
-        self.show_balanced_yearly = show_balanced_yearly
-        self.show_configurable = show_configurable
-        self.show_configurable_date = show_configurable_date
-        self.session = None
+        self._show_generation = show_generation
+        self._show_12_months = show_12_months
+        self._show_balanced = show_balanced
+        self._show_balanced_yearly = show_balanced_yearly
+        self._show_configurable = show_configurable
+        self._show_configurable_date = show_configurable_date
+        self._session: ClientSession | None = None
         self._cache = DailyDataCache(meter_id)
+        self._hass = hass
+        self._storage_key = f"{STORAGE_KEY_PREFIX}_{config_entry_id}" if config_entry_id is not None else None
 
-    def get_raw_data(self) -> TauronAmiplusRawData:
+    async def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
-        # amount_value, amount_status = self.get_moj_tauron()
-        # data.amount_value = amount_value
-        # data.amount_status = amount_status
-        data.tariff = self.login()
+        # data.payments = await self.get_moj_tauron()
+        data.tariff = await self.login()
         generation_max_cache = datetime.datetime.now()
-        data.consumption, consumption_max_cache = self.get_data_set(generation=False)
-        if self.show_generation or self.show_balanced:
-            data.generation, generation_max_cache = self.get_data_set(generation=True)
+        data.consumption, consumption_max_cache = await self.get_data_set(generation=False)
+        if self._show_generation or self._show_balanced:
+            data.generation, generation_max_cache = await self.get_data_set(generation=True)
         else:
             data.generation = TauronAmiplusDataSet()
         self._cache.delete_older_than(min(consumption_max_cache, generation_max_cache))
         return data
 
-    def get_data_set(self, generation) -> Tuple[TauronAmiplusDataSet, datetime.datetime]:
+    async def get_data_set(self, generation) -> Tuple[TauronAmiplusDataSet, datetime.datetime]:
         dataset = TauronAmiplusDataSet()
-        dataset.json_reading = self.get_reading(generation)
-        dataset.json_daily, dataset.daily_date = self.get_values_daily(generation)
-        dataset.json_monthly = self.get_values_monthly(generation)
-        dataset.json_yearly = self.get_values_yearly(generation)
-        dataset.json_month_hourly = self.get_values_month_hourly(generation)
-        dataset.json_last_30_days_hourly = self.get_values_last_30_days_hourly(generation)
+        dataset.json_reading = await self.get_reading(generation)
+        dataset.json_daily, dataset.daily_date = await self.get_values_daily(generation)
+        dataset.json_monthly = await self.get_values_monthly(generation)
+        dataset.json_yearly = await self.get_values_yearly(generation)
+        dataset.json_month_hourly = await self.get_values_month_hourly(generation)
+        dataset.json_last_30_days_hourly = await self.get_values_last_30_days_hourly(generation)
         now = datetime.datetime.now()
         cache_max = datetime.datetime.now() - datetime.timedelta(days=32)
-        if self.show_12_months:
-            dataset.json_last_12_months_hourly = self.get_values_12_months_hourly(generation)
+        if self._show_12_months:
+            dataset.json_last_12_months_hourly = await self.get_values_12_months_hourly(generation)
             cache_max = now.replace(year=now.year - 1) - datetime.timedelta(days=2)
-        if self.show_balanced_yearly:
-            dataset.json_year_hourly = self.get_values_year_hourly(generation)
+        if self._show_balanced_yearly:
+            dataset.json_year_hourly = await self.get_values_year_hourly(generation)
             potential_max = now.replace(day=1, month=1)
             if potential_max < cache_max:
                 cache_max = potential_max
-        if self.show_configurable and self.show_configurable_date is not None:
+        if self._show_configurable and self._show_configurable_date is not None:
             end = datetime.datetime.now()
-            start = datetime.datetime.combine(self.show_configurable_date, end.time())
-            dataset.json_configurable_hourly = self.get_raw_values_daily_for_range(start, end, generation)
+            start = datetime.datetime.combine(self._show_configurable_date, end.time())
+            dataset.json_configurable_hourly = await self.get_raw_values_daily_for_range(start, end, generation)
             potential_max = end - datetime.timedelta(days=2)
             if potential_max < cache_max:
                 cache_max = potential_max
         return dataset, cache_max
 
-    def login_service(self, login_url: str, service: str) -> tuple[Session, Response]:
+    async def login_service(self, login_url: str, service: str) -> tuple[ClientSession, str]:
+        success, response, session = await self.try_restore_session(service)
+        if success:
+            return session, response
+
+        self.log(f"Logging in... ({service})")
         payload_login = {
-            "username": self.username,
-            "password": self.password,
+            "username": self._username,
+            "password": self._password,
             "service": service,
         }
-        session = requests.session()
-        session.mount("https://", TLSAdapter())
-        self.log(f"Logging in... ({service})")
-        r1 = session.request(
+        r1 = await session.request(
             "POST",
             login_url,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
-        if "Przekroczono maksymalną liczbę logowań." in r1.text:
+        if "Przekroczono maksymalną liczbę logowań." in await r1.text():
             self.log("Too many login attempts")
             raise Exception("Too many login attempts")
-        r2 = session.request(
+        r2 = await session.request(
             "POST",
             login_url,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
         )
-        if "Przekroczono maksymalną liczbę logowań." in r2.text:
+        r2_text = await r2.text()
+        if "Przekroczono maksymalną liczbę logowań." in r2_text:
             self.log("Too many login attempts")
             raise Exception("Too many login attempts")
-        if "Login lub hasło są nieprawidłowe." in r2.text:
+        if "Login lub hasło są nieprawidłowe." in r2_text:
             self.log("Invalid credentials")
             raise Exception("Invalid credentials")
-        if (self.username not in r2.text) and (self.username.upper() not in r2.text):
+        if (self._username not in r2_text) and (self._username.upper() not in r2_text):
             self.log("Failed to login")
             raise Exception("Failed to login")
-        return session, r2
+        await self.store_session(session, service)
+        return session, r2_text
 
-    def login(self):
-        session, login_response = self.login_service(CONST_URL_LOGIN, CONST_URL_SERVICE)
-        self.session = session
-        self.log("Logged in.")
-        self.meters = self._get_meters(login_response.text)
-        payload_select_meter = {"site[client]": self.meter_id}
-        selected_meter_info = list(filter(lambda m: m["meter_id"] == self.meter_id, self.meters))
-        if len(selected_meter_info) > 0:
-            self.is_business = selected_meter_info[0]["meter_type"] == "WO"
+    async def try_restore_session(self, service: str) -> (bool, str | None, ClientSession):
+        session = async_create_clientsession(self._hass)
+        if self._storage_key is None or self._hass is None:
+            self.log("NO SESSION TO RESTORE ({service})")
+            return False, None, session
+        self.log(f"RESTORING SESSION {self._storage_key}_{slugify(service)}")
+        store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
+        stored_data = await store.async_load()
+        if stored_data is None:
+            return False, None
+        cookies = {k: v for k, v in stored_data.get("cookies", {}).items() if k in ["PHPSESSID", "ASP.NET_SessionId"]}
+        self.log(f"COOKIES ({service}): {cookies}")
+        session.cookie_jar.clear(lambda x: True)
+        session.cookie_jar.update_cookies(cookies)
+
+        success, response = await self.validate_session(session, service)
+        self.log(f"SESSION VALID ({service}): {success}")
+
+        if success:
+            session_to_return = session
         else:
-            self.is_business = False
-        self.log(f"Selecting meter: {self.meter_id}")
-        select_response = self.session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
-        tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response.text)
+            self.log(f"FAILED TO RESTORE SESSION ({service})")
+            self.log(f"INVALID SESSION RESPONSE ({service})")
+            self.log(response)
+            await store.async_save({})
+            await session.close()
+            session_to_return = async_create_clientsession(self._hass)
+        return success, response, session_to_return
+
+    async def store_session(self, session: ClientSession, service: str) -> None:
+        if self._storage_key is None or self._hass is None:
+            self.log(f"SKIPPING STORING SESSION")
+            return
+        self.log(f"SAVING SESSION {self._storage_key}_{slugify(service)}")
+        store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
+        for cookie in session.cookie_jar:
+
+            print(cookie)
+
+        cookies = {cookie.key: cookie.value for cookie in session.cookie_jar if cookie.key in ["PHPSESSID", "ASP.NET_SessionId"]}
+        self.log(f"SAVED COOKIES ({service}) {cookies}")
+        await store.async_save({"cookies": cookies})
+
+    async def validate_session(self, session: ClientSession, service: str) -> (bool, str):
+        response = await session.get(service)
+        response_text = await response.text()
+        return self._username in response_text or self._username.upper() in response_text.upper(), response_text
+
+    async def login(self):
+        session, login_response_text = await self.login_service(CONST_URL_LOGIN, CONST_URL_SERVICE)
+        self._session = session
+        self.log("Logged in to eLicznik.")
+        self.meters = self._get_meters(login_response_text)
+        payload_select_meter = {"site[client]": self._meter_id}
+        selected_meter_info = list(filter(lambda m: m["meter_id"] == self._meter_id, self.meters))
+        if len(selected_meter_info) > 0:
+            self._is_business = selected_meter_info[0]["meter_type"] == "WO"
+        else:
+            self._is_business = False
+        self.log(f"Selecting meter: {self._meter_id}")
+        select_response = await self._session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        select_response_text = await select_response.text()
+        tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response_text)
         if len(tariff_search) > 0:
             tariff = tariff_search[0]
             return tariff
@@ -225,7 +294,7 @@ class TauronAmiplusConnector:
             meters.append({"meter_id": meter_id, "meter_name": display_name, "meter_type": meter_type})
         return meters
 
-    def get_values_yearly(self, generation):
+    async def get_values_yearly(self, generation):
         now = datetime.datetime.now()
         first_day_of_year = now.replace(day=1, month=1)
         last_day_of_year = now.replace(day=31, month=12)
@@ -237,14 +306,14 @@ class TauronAmiplusConnector:
             "energy": 2 if generation else 1,
         }
         self.log(f"Downloading yearly data for year: {now.year}, generation: {generation}")
-        values = self.get_chart_values(payload)
+        values = await self.get_chart_values(payload)
         if values is not None:
             self.log(f"Downloaded yearly data for year: {now.year}, generation: {generation}")
         else:
             self.log(f"Failed to download yearly data for year: {now.year}, generation: {generation}")
         return values
 
-    def get_values_monthly(self, generation):
+    async def get_values_monthly(self, generation):
         now = datetime.datetime.now()
         month = now.month
         first_day_of_month = now.replace(day=1)
@@ -257,54 +326,54 @@ class TauronAmiplusConnector:
             "type": "oze" if generation else "consum",
             "energy": 2 if generation else 1,
         }
-        values = self.get_chart_values(payload)
+        values = await self.get_chart_values(payload)
         if values is not None:
             self.log(f"Downloaded monthly data for month: {now.year}.{now.month}, generation: {generation}")
         else:
             self.log(f"Failed to download monthly data for month: {now.year}.{now.month}, generation: {generation}")
         return values
 
-    def get_values_daily(self, generation):
+    async def get_values_daily(self, generation):
         offset = 1
         data = None
         day = None
         while offset <= CONST_MAX_LOOKUP_RANGE and data is None:
-            data, day = self.get_raw_values_daily(offset, generation)
+            data, day = await self.get_raw_values_daily(offset, generation)
             offset += 1
         return data, day
 
-    def get_raw_values_daily(self, days_before, generation):
+    async def get_raw_values_daily(self, days_before, generation):
         day = datetime.datetime.now() - datetime.timedelta(days_before)
-        return self.get_raw_values_daily_for_day(day, generation), TauronAmiplusConnector.format_date(day)
+        return await self.get_raw_values_daily_for_day(day, generation), TauronAmiplusConnector.format_date(day)
 
-    def get_values_month_hourly(self, generation):
+    async def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
-    def get_values_year_hourly(self, generation):
+    async def get_values_year_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(day=1, month=1)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
-    def get_values_last_30_days_hourly(self, generation):
+    async def get_values_last_30_days_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now - datetime.timedelta(days=30)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
-    def get_values_12_months_hourly(self, generation):
+    async def get_values_12_months_hourly(self, generation):
         now = datetime.datetime.now()
         start_day = now.replace(year=now.year - 1)
-        return self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
-    def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, generation):
+    async def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, generation):
         data = {"data": {
             "allData": [],
             "sum": 0,
             "zones": {}
         }}
         for day in [day_from + datetime.timedelta(days=x) for x in range((day_to - day_from).days + 1)]:
-            day_data = self.get_raw_values_daily_for_day(day, generation)
+            day_data = await self.get_raw_values_daily_for_day(day, generation)
             if day_data is not None:
                 data["data"]["allData"].extend(day_data["data"]["allData"])
                 data["data"]["sum"] += day_data["data"]["sum"]
@@ -321,7 +390,7 @@ class TauronAmiplusConnector:
             return None
         return data
 
-    def get_raw_values_daily_for_day(self, day, generation):
+    async def get_raw_values_daily_for_day(self, day, generation):
         day_str = TauronAmiplusConnector.format_date(day)
         cached_data = self._cache.get_value(day, generation)
         if cached_data is not None:
@@ -336,7 +405,7 @@ class TauronAmiplusConnector:
             "energy": 2 if generation else 1,
         }
         self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
-        values = self.get_chart_values(payload)
+        values = await self.get_chart_values(payload)
         if values is not None:
             if values['data']['allData'] is None or any(a is None for a in values['data']['allData']):
                 self.add_all_data(values, day)
@@ -350,7 +419,7 @@ class TauronAmiplusConnector:
         self.log(f"Failed to download daily data for day: {day_str}, generation: {generation}")
         return None
 
-    def get_reading(self, generation):
+    async def get_reading(self, generation):
         date_to = datetime.datetime.now()
         date_from = (date_to - datetime.timedelta(CONST_MAX_LOOKUP_RANGE))
 
@@ -361,87 +430,77 @@ class TauronAmiplusConnector:
             "type": "energia-oddana" if generation else "energia-pobrana"
         }
         self.log(f"Downloading readings for date: {date_to_str}, generation: {generation}")
-        post = self.execute_post(CONST_URL_READINGS, payload)
+        post = await self.execute_post(CONST_URL_READINGS, payload)
         if post is not None:
             self.log(f"Downloaded readings for date: {date_to_str}, generation: {generation}")
         else:
             self.log(f"Failed to download readings for date: {date_to_str}, generation: {generation}")
         return post
 
-    def get_chart_values(self, payload):
-        return self.execute_post(CONST_URL_ENERGY_BUSINESS if self.is_business else CONST_URL_ENERGY, payload)
+    async def get_chart_values(self, payload):
+        return await self.execute_post(CONST_URL_ENERGY_BUSINESS if self._is_business else CONST_URL_ENERGY, payload)
 
-    def execute_post(self, url, payload):
+    async def execute_post(self, url: str, payload: dict):
         self.log(f"EXECUTING: {url} with payload: {payload}")
-        response = self.session.request(
+        response = await self._session.request(
             "POST",
             url,
             data=payload,
             headers=CONST_REQUEST_HEADERS,
         )
-        self.log(f"RESPONSE: {response.text}")
-        if "Przekroczono maksymalną liczbę logowań." in response.text:
+        response_text = await response.text()
+        self.log(f"RESPONSE: {response_text}")
+        if "Przekroczono maksymalną liczbę logowań." in response_text:
             self.log("Too many login attempts")
             raise Exception("Too many login attempts")
-        if response.status_code == 200 and response.text.startswith('{"success":true'):
-            json_data = response.json()
+        if response.status == 200 and response_text.startswith('{"success":true'):
+            json_data = await response.json()
+            self.log(f"RESPONSE JSON: {json_data}")
             return json_data
         return None
 
     def log(self, msg):
-        _LOGGER.debug(f"[{self.meter_id}]: {msg}")
+        _LOGGER.debug(f"[{self._meter_id}]: {msg}")
 
-    def get_moj_tauron(self):
-        session, response = self.login_service(CONST_URL_LOGIN_MOJ_TAURON, CONST_URL_SERVICE_MOJ_TAURON)
-
-        if response is None:
-            return None, "unknown"
-        find_1_1 = re.findall(r".*class=\"amount-value\".*", response.text)
-        find_2_1 = re.findall(r".*class=\"amount-status\".*", response.text)
-        if len(find_1_1) > 0 and len(find_2_1) > 0:
-            amount_value = float(
-                find_1_1[0].strip()
-                .replace("<span class=\"amount-value\">", "")
-                .replace("zł", "")
-                .replace("</span>", "")
-                .replace(",", ".").strip())
-            amount_status = (find_2_1[0].strip()
-                             .replace("<span class=\"amount-status\">", "")
-                             .replace("</span>", "").strip())
-            return amount_value, amount_status
-
-        find_1_2 = re.findall(r".*class=\"amount\".*\s*.*\s*</div>", response.text)
-        find_2_2 = re.findall(r".*class=\"date\".*", response.text)
-        if len(find_1_2) > 0 and len(find_2_2) > 0:
-            amount_value = float(
-                find_1_2[0].strip()
-                .replace("<div class=\"amount\">", "")
-                .replace("zł", "")
-                .replace("</div>", "")
-                .replace(",", ".").strip())
-            amount_status = (find_2_2[0].strip()
-                             .replace("<div class=\"date\">", "")
-                             .replace("</div>", "").strip())
-            return amount_value, amount_status
-
-        return None, "unknown"
+    async def get_moj_tauron(self) -> list[MojTauronPaymentData]:
+        session, response_text = await self.login_service(CONST_URL_LOGIN_MOJ_TAURON, CONST_URL_SERVICE_MOJ_TAURON)
+        self.log("MÓJ TAURON")
+        self.log(response_text)
+        if response_text is None:
+            return []
+        try:
+            # parser = BeautifulSoup(response_text, "html.parser")
+            # amounts = parser.select(".amount:not(.okay):not(.warning)")
+            # dates = parser.select(".date:not(.okay):not(.warning)")
+            payments = []
+            # for i in range(min(len(amounts), len(dates))):
+            #     try:
+            #         amount = float(amounts[i].text.strip().split("\n")[0].strip().replace(",", ".").replace(" zł", ""))
+            #         date = dates[i].text.replace("Termin:", "").strip()
+            #         payments.append(MojTauronPaymentData(amount, date))
+            #     except Exception as err:
+            #         _LOGGER.error("Error during parsing. %s", err)
+            return payments
+        except Exception as err:
+            _LOGGER.error("Error during downloading. %s", err)
+            return []
 
     @staticmethod
     def format_date(date):
         return date.strftime(CONST_DATE_FORMAT)
 
     @staticmethod
-    def get_available_meters(username, password):
-        connector = TauronAmiplusConnector(username, password, "placeholder")
-        connector.login()
+    async def get_available_meters(username, password, hass: HomeAssistant):
+        connector = TauronAmiplusConnector(username, password, "placeholder", hass)
+        await connector.login()
         if connector.meters is not None and len(connector.meters) > 0:
             return connector.meters
         raise Exception("Failed to retrieve energy meters")
 
     @staticmethod
-    def calculate_tariff(username, password, meter_id):
-        connector = TauronAmiplusConnector(username, password, meter_id)
-        tariff = connector.login()
+    async def calculate_tariff(username, password, meter_id, hass: HomeAssistant):
+        connector = TauronAmiplusConnector(username, password, meter_id, hass)
+        tariff = await connector.login()
         if tariff is not None:
             return tariff
         raise Exception("Failed to calculate configuration")
