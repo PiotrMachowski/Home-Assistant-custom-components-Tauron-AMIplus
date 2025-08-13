@@ -283,7 +283,7 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Perform reauth upon an authentication error or missing cloud credentials."""
         return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(self, user_input: dict[str, Any] | None = None):
+    async def async_step_reauth_confirm(self, user_input = None):
         """Dialog that informs the user that reauth is required."""
         if user_input is not None:
             return await self.async_step_init()

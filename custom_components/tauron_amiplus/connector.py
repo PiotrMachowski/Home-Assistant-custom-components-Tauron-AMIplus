@@ -235,7 +235,6 @@ class TauronAmiplusConnector:
             self.log(f"INVALID SESSION RESPONSE ({service})")
             self.log(response)
             await store.async_save({})
-            await session.close()
             session_to_return = async_create_clientsession(self._hass)
         return success, response, session_to_return
 
