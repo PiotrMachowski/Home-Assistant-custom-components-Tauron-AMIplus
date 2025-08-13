@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 from aiohttp import ClientSession
 # from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
@@ -202,7 +203,7 @@ class TauronAmiplusConnector:
             raise Exception("Too many login attempts")
         if "Login lub hasło są nieprawidłowe." in r2_text:
             self.log("Invalid credentials")
-            raise Exception("Invalid credentials")
+            raise ConfigEntryAuthFailed("Invalid credentials")
         if (self._username not in r2_text) and (self._username.upper() not in r2_text):
             self.log("Failed to login")
             raise Exception("Failed to login")

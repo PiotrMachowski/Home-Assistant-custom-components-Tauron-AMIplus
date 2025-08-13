@@ -32,6 +32,10 @@
           "show_configurable_sensors_date": "Start date for configurable data period",
           "store_statistics": "Store hourly statistics (for Energy dashboard)"
         }
+      },
+      "reauth_confirm": {
+        "description": "Integration needs to re-authenticate your account in order to update credentials.",
+        "title": "Authentication expired for {name}"
       }
     },
     "error": {
