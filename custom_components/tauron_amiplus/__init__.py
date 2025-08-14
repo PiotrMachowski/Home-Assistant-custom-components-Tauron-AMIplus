@@ -90,6 +90,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConf
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     service = DownloadStatisticsService(hass)
     hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
+    await tauron_amiplus_update_coordinator.async_request_refresh()
     return True
 
 
