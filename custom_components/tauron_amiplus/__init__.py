@@ -5,17 +5,19 @@ import logging
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
+from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.util.dt import DATE_STR_FORMAT
+from homeassistant.util.dt import DATE_STR_FORMAT, parse_date
 
 from .const import (
     CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
     CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS, CONF_TARIFF,
     DOMAIN, PLATFORMS,
 )
+from .coordinator import TauronAmiplusUpdateCoordinator
 from .services import DownloadStatisticsService
+from .typing_helpers import TauronAmiplusRuntimeData, TauronAmiplusConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,19 +47,54 @@ async def async_setup(hass, config):
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConfigEntry) -> bool:
     """Set up TAURON as config entry."""
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 
+    user = config_entry.data[CONF_USERNAME]
+    password = config_entry.data[CONF_PASSWORD]
+    meter_id = config_entry.data[CONF_METER_ID]
+    meter_name = config_entry.data[CONF_METER_NAME]
+    tariff = config_entry.data[CONF_TARIFF]
+
+    show_generation_sensors = config_entry.options.get(CONF_SHOW_GENERATION, False)
+    show_12_months = config_entry.options.get(CONF_SHOW_12_MONTHS, False)
+    show_balanced = config_entry.options.get(CONF_SHOW_BALANCED, False)
+    show_balanced_year = config_entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
+    show_configurable = config_entry.options.get(CONF_SHOW_CONFIGURABLE, False)
+    show_configurable_date = config_entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+    store_statistics = config_entry.options.get(CONF_STORE_STATISTICS, False)
+    if show_configurable_date is not None:
+        show_configurable_date = parse_date(show_configurable_date)
+    else:
+        show_configurable = False
+
+    tauron_amiplus_update_coordinator = TauronAmiplusUpdateCoordinator(
+        hass,
+        config_entry.entry_id,
+        user,
+        password,
+        meter_id,
+        meter_name,
+        show_generation=show_generation_sensors,
+        show_12_months=show_12_months,
+        show_balanced=show_balanced,
+        show_balanced_year=show_balanced_year,
+        show_configurable=show_configurable,
+        show_configurable_date=show_configurable_date,
+        store_statistics=store_statistics,
+    )
+    config_entry.runtime_data = TauronAmiplusRuntimeData(tauron_amiplus_update_coordinator)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     service = DownloadStatisticsService(hass)
     hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
+    await tauron_amiplus_update_coordinator.async_request_refresh()
     return True
 
 
-async def async_unload_entry(hass, config_entry):
+async def async_unload_entry(hass, config_entry) -> bool:
     """Unload a config entry."""
     await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
     return True
@@ -69,7 +106,7 @@ async def async_reload_entry(hass, entry) -> None:
     await async_setup_entry(hass, entry)
 
 
-async def async_migrate_entry(hass, config_entry: ConfigEntry):
+async def async_migrate_entry(hass, config_entry: TauronAmiplusConfigEntry) -> bool:
     """Migrate old entry."""
     _LOGGER.debug("Migrating from version %s", config_entry.version)
 

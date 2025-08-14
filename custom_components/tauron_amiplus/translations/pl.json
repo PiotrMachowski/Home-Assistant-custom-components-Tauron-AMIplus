@@ -32,6 +32,10 @@
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
           "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
+      },
+      "reauth_confirm": {
+        "description": "Integracja musi zaktualizować dane logowania.",
+        "title": "Błąd logowania {name}"
       }
     },
     "error": {

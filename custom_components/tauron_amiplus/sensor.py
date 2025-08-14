@@ -1,23 +1,23 @@
 """Support for TAURON sensors."""
+import dataclasses
 import logging
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util.dt import parse_date
 
 from .connector import TauronAmiplusRawData
 from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
-                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
-                    CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
+                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF,
+                    CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
                     CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
                     DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY,
                     TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY,
-                    TYPE_AMOUNT, TYPE_AMOUNT_STATUS, TYPE_AMOUNT_VALUE)
+                    TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT)
 from .coordinator import TauronAmiplusUpdateCoordinator
+from .typing_helpers import TauronAmiplusConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     show_balanced = any(filter(lambda v: CONST_BALANCED in v, config[CONF_MONITORED_VARIABLES]))
     show_balanced_year = CONF_SHOW_BALANCED_YEAR in config[CONF_MONITORED_VARIABLES]
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, username, password, meter_id, name,
+    coordinator = TauronAmiplusUpdateCoordinator(hass, "YAML", username, password, meter_id, name,
                                                  show_generation=show_generation_sensors,
                                                  show_12_months=show_12_months,
                                                  show_balanced=show_balanced,
@@ -55,10 +55,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     async_add_entities(dev, True)
 
 
-async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_entities):
     """Set up a TAURON sensor based on a config entry."""
-    user = entry.data[CONF_USERNAME]
-    password = entry.data[CONF_PASSWORD]
+    coordinator = entry.runtime_data.coordinator
     meter_id = entry.data[CONF_METER_ID]
     meter_name = entry.data[CONF_METER_NAME]
     tariff = entry.data[CONF_TARIFF]
@@ -69,10 +68,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     show_balanced_year = entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
     show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
-    store_statistics = entry.options.get(CONF_STORE_STATISTICS, False)
-    if show_configurable_date is not None:
-        show_configurable_date = parse_date(show_configurable_date)
-    else:
+    if show_configurable_date is None:
         show_configurable = False
 
     sensors = []
@@ -90,15 +86,6 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     if not show_configurable:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
 
-    coordinator = TauronAmiplusUpdateCoordinator(hass, user, password, meter_id, meter_name,
-                                                 show_generation=show_generation_sensors,
-                                                 show_12_months=show_12_months,
-                                                 show_balanced=show_balanced,
-                                                 show_balanced_year=show_balanced_year,
-                                                 show_configurable=show_configurable,
-                                                 show_configurable_date=show_configurable_date,
-                                                 store_statistics=store_statistics)
-    await coordinator.async_request_refresh()
     for sensor_type, sensor_type_config in sensor_types.items():
         sensors.append(
             TauronAmiplusConfigFlowSensor(
@@ -136,10 +123,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
     @property
     def native_unit_of_measurement(self):
-        if self._sensor_type == TYPE_AMOUNT_VALUE:
+        if self._sensor_type == TYPE_AMOUNT_PAYMENT:
             return "zł"
-        elif self._sensor_type == TYPE_AMOUNT_STATUS:
-            return None
         return UnitOfEnergy.KILO_WATT_HOUR
 
     @property
@@ -171,17 +156,16 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     def _handle_coordinator_update(self) -> None:
         self.log(f"Updating data for entry: {self._sensor_type}")
         data: TauronAmiplusRawData = self.coordinator.data
+        self.log(f"DATA: {data}")
         if not self.available or data is None:
             return
         dataset = data.generation if self._generation else data.consumption
         self._tariff = data.tariff
 
-        if self._sensor_type == TYPE_AMOUNT_VALUE and data.amount_value is not None:
-            self._state = data.amount_value
-            self._params = {"status": data.amount_status}
-        elif self._sensor_type == TYPE_AMOUNT_STATUS and data.amount_status is not None:
-            self._state = data.amount_status
-            self._params = {"value": data.amount_value}
+        if self._sensor_type == TYPE_AMOUNT_PAYMENT and len(data.payments)>0:
+            self._state = data.payments[0].value
+            payments = list(map(lambda p: dataclasses.asdict(p), data.payments))
+            self._params = {"date": data.payments[0].date, "payments": payments}
         elif self._sensor_type == TYPE_BALANCED_DAILY and data.balance_daily is not None:
             self.update_balanced_data(data.balance_daily)
         elif self._sensor_type == TYPE_BALANCED_MONTHLY and data.balance_monthly is not None:

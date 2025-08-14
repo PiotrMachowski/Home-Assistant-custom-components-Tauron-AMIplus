@@ -39,6 +39,8 @@ CONST_MONTHLY = "monthly"
 CONST_YEARLY = "yearly"
 CONST_LAST_12_MONTHS = "last_12_months"
 CONST_CONFIGURABLE = "configurable"
+STORAGE_VERSION = 1
+STORAGE_KEY_PREFIX = f"{DOMAIN}_session_data"
 TYPE_BALANCED_DAILY = f"{CONST_BALANCED}_{CONST_DAILY}"
 TYPE_BALANCED_MONTHLY = f"{CONST_BALANCED}_{CONST_MONTHLY}"
 TYPE_BALANCED_YEARLY = f"{CONST_BALANCED}_{CONST_YEARLY}"
@@ -57,8 +59,7 @@ TYPE_GENERATION_YEARLY = f"{CONST_GENERATION}_{CONST_YEARLY}"
 TYPE_GENERATION_LAST_12_MONTHS = f"{CONST_GENERATION}_{CONST_LAST_12_MONTHS}"
 TYPE_GENERATION_CONFIGURABLE = f"{CONST_GENERATION}_{CONST_CONFIGURABLE}"
 TYPE_AMOUNT = "moj_tauron"
-TYPE_AMOUNT_VALUE = f"{TYPE_AMOUNT}_VALUE"
-TYPE_AMOUNT_STATUS = f"{TYPE_AMOUNT}_STATUS"
+TYPE_AMOUNT_PAYMENT = f"{TYPE_AMOUNT}_PAYMENT"
 
 DEFAULT_UPDATE_INTERVAL = timedelta(hours=8, minutes=30)
 SENSOR_TYPES_YAML = {
@@ -133,12 +134,8 @@ SENSOR_TYPES = {
         "name": "Configurable balance",
         "state_class": SensorStateClass.TOTAL,
     },
-    # TYPE_AMOUNT_VALUE: {
+    # TYPE_AMOUNT_PAYMENT: {
     #     "name": "Account balance",
     #     "state_class": SensorStateClass.MEASUREMENT,
-    # },
-    # TYPE_AMOUNT_STATUS: {
-    #     "name": "Account status",
-    #     "state_class": None,
     # },
 }

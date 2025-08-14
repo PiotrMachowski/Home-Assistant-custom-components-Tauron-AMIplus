@@ -1,23 +1,18 @@
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
-from .connector import TauronAmiplusConnector
-from .const import (CONF_METER_ID, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
+from .const import (CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
                     CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
                     CONF_TARIFF)
+from .typing_helpers import TauronAmiplusConfigEntry
 
 
-async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
-    return await hass.async_add_executor_job(get_config_entry_diagnostics, entry)
+async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: TauronAmiplusConfigEntry) -> dict[str, Any]:
+    return await get_config_entry_diagnostics(hass, entry)
 
 
-def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
-    user = entry.data[CONF_USERNAME]
-    password = entry.data[CONF_PASSWORD]
-    meter_id = entry.data[CONF_METER_ID]
+async def get_config_entry_diagnostics(hass: HomeAssistant, entry: TauronAmiplusConfigEntry) -> dict[str, Any]:
     tariff = entry.data[CONF_TARIFF]
     show_generation_sensors = entry.options.get(CONF_SHOW_GENERATION, False)
     show_12_months = entry.options.get(CONF_SHOW_12_MONTHS, False)
@@ -27,10 +22,8 @@ def get_config_entry_diagnostics(entry: ConfigEntry) -> dict[str, Any]:
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, False)
     store_statistics = entry.options.get(CONF_STORE_STATISTICS, False)
 
-    connector = TauronAmiplusConnector(user, password, meter_id,
-                                       show_generation=show_generation_sensors,
-                                       show_balanced=show_balanced)
-    raw_data = connector.get_raw_data()
+    connector = entry.runtime_data.coordinator.connector
+    raw_data = await connector.get_raw_data()
 
     return {
         "tariff": tariff,

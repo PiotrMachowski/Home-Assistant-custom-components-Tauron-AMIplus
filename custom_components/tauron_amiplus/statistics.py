@@ -28,7 +28,7 @@ class TauronAmiplusStatisticsUpdater:
         self.show_balanced = show_balanced
 
     @staticmethod
-    async def manually_update(hass, start_date: datetime.date, entry):
+    async def manually_update(hass, start_date: datetime.date, entry) -> None:
         username = entry.data[CONF_USERNAME]
         password = entry.data[CONF_PASSWORD]
         meter_id = entry.data[CONF_METER_ID]
@@ -37,11 +37,11 @@ class TauronAmiplusStatisticsUpdater:
         show_generation = entry.options.get(CONF_SHOW_GENERATION, False)
         show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
 
-        connector = TauronAmiplusConnector(username, password, meter_id, show_generation=show_generation,
+        connector = TauronAmiplusConnector(username, password, meter_id, hass=hass, config_entry_id=entry.entry_id, show_generation=show_generation,
                                            show_balanced=show_balanced)
         statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, meter_name, show_generation, show_balanced)
 
-        data = await hass.async_add_executor_job(connector.get_raw_data)
+        data = await connector.get_raw_data()
         start_date = datetime.datetime.combine(start_date,
                                                datetime.time(tzinfo=datetime.datetime.now().astimezone().tzinfo))
         if data is not None:
@@ -66,13 +66,11 @@ class TauronAmiplusStatisticsUpdater:
                 start_range = (now - datetime.timedelta(365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             else:
                 start_range = start_date.replace(tzinfo=None)
-            data_consumption = await self.hass.async_add_executor_job(self.connector.get_raw_values_daily_for_range,
-                                                                      start_range, now, False)
+            data_consumption = await self.connector.get_raw_values_daily_for_range(start_range, now, False)
             if data_consumption is not None:
                 raw_data[CONST_CONSUMPTION] = data_consumption["data"]["allData"]
             if self.show_generation or self.show_balanced:
-                data_generation = await self.hass.async_add_executor_job(self.connector.get_raw_values_daily_for_range,
-                                                                         start_range, now, True)
+                data_generation = await self.connector.get_raw_values_daily_for_range(start_range, now, True)
                 if data_generation is not None:
                     raw_data[CONST_GENERATION] = data_generation["data"]["allData"]
 
