@@ -271,7 +271,7 @@ class TauronAmiplusConnector:
         self.log(f"Selecting meter: {self._meter_id}")
         select_response = await self._session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         select_response_text = await select_response.text()
-        tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response_text)
+        tariff_search = re.findall(r"[^_]Tariff: '(.*)',", select_response_text)
         if len(tariff_search) > 0:
             tariff = tariff_search[0]
             return tariff
