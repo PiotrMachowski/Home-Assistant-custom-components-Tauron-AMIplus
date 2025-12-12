@@ -2,7 +2,7 @@ import datetime
 import logging
 
 from homeassistant.components.recorder import get_instance
-from homeassistant.components.recorder.models import StatisticMetaData
+from homeassistant.components.recorder.models import StatisticMetaData, StatisticMeanType
 from homeassistant.components.recorder.statistics import (async_add_external_statistics, get_last_statistics,
                                                           statistics_during_period)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy
@@ -213,7 +213,9 @@ class TauronAmiplusStatisticsUpdater:
             "name": statistic_name,
             "source": STATISTICS_DOMAIN,
             "statistic_id": statistic_id,
-            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR
+            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+            "mean_type": StatisticMeanType.NONE,
+            "unit_class": "energy",
         }
         statistic_data = []
         for raw_hour in raw_data:

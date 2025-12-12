@@ -244,10 +244,6 @@ class TauronAmiplusConnector:
             return
         self.log(f"SAVING SESSION {self._storage_key}_{slugify(service)}")
         store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
-        for cookie in session.cookie_jar:
-
-            print(cookie)
-
         cookies = {cookie.key: cookie.value for cookie in session.cookie_jar if cookie.key in ["PHPSESSID", "ASP.NET_SessionId"]}
         self.log(f"SAVED COOKIES ({service}) {cookies}")
         await store.async_save({"cookies": cookies})
@@ -271,7 +267,7 @@ class TauronAmiplusConnector:
         self.log(f"Selecting meter: {self._meter_id}")
         select_response = await self._session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
         select_response_text = await select_response.text()
-        tariff_search = re.findall(r"'Tariff' : '(.*)',", select_response_text)
+        tariff_search = re.findall(r"[^_]Tariff: '(.*)',", select_response_text)
         if len(tariff_search) > 0:
             tariff = tariff_search[0]
             return tariff
