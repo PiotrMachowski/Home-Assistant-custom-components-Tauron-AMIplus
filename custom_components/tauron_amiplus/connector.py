@@ -244,10 +244,6 @@ class TauronAmiplusConnector:
             return
         self.log(f"SAVING SESSION {self._storage_key}_{slugify(service)}")
         store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
-        for cookie in session.cookie_jar:
-
-            print(cookie)
-
         cookies = {cookie.key: cookie.value for cookie in session.cookie_jar if cookie.key in ["PHPSESSID", "ASP.NET_SessionId"]}
         self.log(f"SAVED COOKIES ({service}) {cookies}")
         await store.async_save({"cookies": cookies})
