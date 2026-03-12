@@ -162,6 +162,20 @@ class TauronAmiplusStatisticsUpdater:
         return (as_utc(now) - last_stats_end).days < 30
 
     @staticmethod
+    def _safe_float(value, default: float = 0.0) -> float:
+        if value is None:
+            return default
+        try:
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    return default
+                value = value.replace(",", ".")
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
     def prepare_balanced_raw_data(raw_data) -> (dict, dict):
         consumption_data = raw_data[CONST_CONSUMPTION]
         generation_data = raw_data[CONST_GENERATION]
@@ -171,8 +185,8 @@ class TauronAmiplusStatisticsUpdater:
         balanced_generation = []
 
         for consumption, generation in zip(consumption_data, generation_data):
-            value_consumption = float(consumption["EC"])
-            value_generation = float(generation["EC"])
+            value_consumption = TauronAmiplusStatisticsUpdater._safe_float(consumption.get("EC"))
+            value_generation = TauronAmiplusStatisticsUpdater._safe_float(generation.get("EC"))
             balance = value_consumption - value_generation
             if balance > 0:
                 output_consumption = {
@@ -222,7 +236,7 @@ class TauronAmiplusStatisticsUpdater:
             start = self.get_time(raw_hour)
             if last_stats_time is not None and start <= last_stats_time:
                 continue
-            usage = float(raw_hour["EC"])
+            usage = self._safe_float(raw_hour.get("EC"))
             if zone_id is not None and raw_hour["Zone"] != zone_id:
                 usage = 0
             current_sum += usage
