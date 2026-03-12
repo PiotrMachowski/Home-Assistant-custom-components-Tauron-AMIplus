@@ -403,7 +403,8 @@ class TauronAmiplusConnector:
         self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
         values = await self.get_chart_values(payload)
         if values is not None:
-            if values['data']['allData'] is None or any(a is None for a in values['data']['allData']):
+            all_data = values.get('data', {}).get('allData')
+            if all_data is None or any(a is None or a.get("EC") is None for a in all_data):
                 self.add_all_data(values, day)
             else:
                 for i, v in enumerate(values['data']['allData']):
