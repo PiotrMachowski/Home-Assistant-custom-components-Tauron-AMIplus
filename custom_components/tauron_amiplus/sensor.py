@@ -31,6 +31,15 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 })
 
 
+def _safe_float(value):
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     name = config.get(CONF_NAME)
     username = config.get(CONF_USERNAME)
@@ -248,11 +257,15 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         sum_consumption = 0
         sum_generation = 0
         zones = {}
+        skipped_entries = 0
 
         for consumption, generation in zip(consumption_data, generation_data):
-            value_consumption = float(consumption["EC"])
-            value_generation = float(generation["EC"])
-            zone = zone_names[consumption["Zone"]]
+            value_consumption = _safe_float(consumption.get("EC"))
+            value_generation = _safe_float(generation.get("EC"))
+            if value_consumption is None or value_generation is None:
+                skipped_entries += 1
+                continue
+            zone = zone_names.get(consumption["Zone"], consumption["Zone"])
             balance = value_consumption - value_generation
             if balance > 0:
                 sum_consumption += balance
@@ -266,6 +279,9 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
                 if zone_key not in zones:
                     zones[zone_key] = 0
                 zones[zone_key] += balance
+
+        if skipped_entries > 0:
+            _LOGGER.debug("Skipped %s invalid balanced entries with missing EC value", skipped_entries)
 
         balance = sum_consumption + sum_generation
         return balance, sum_consumption, sum_generation, zones, data_range

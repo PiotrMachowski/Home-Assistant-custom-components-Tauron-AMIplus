@@ -16,6 +16,15 @@ from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_BALANCED, CONF_SHO
 _LOGGER = logging.getLogger(__name__)
 
 
+def _safe_float(value):
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class TauronAmiplusStatisticsUpdater:
 
     def __init__(self, hass: HomeAssistant, connector: TauronAmiplusConnector, meter_id: str, meter_name: str,
@@ -169,10 +178,14 @@ class TauronAmiplusStatisticsUpdater:
             return {}, {}
         balanced_consumption = []
         balanced_generation = []
+        skipped_entries = 0
 
         for consumption, generation in zip(consumption_data, generation_data):
-            value_consumption = float(consumption["EC"])
-            value_generation = float(generation["EC"])
+            value_consumption = _safe_float(consumption.get("EC"))
+            value_generation = _safe_float(generation.get("EC"))
+            if value_consumption is None or value_generation is None:
+                skipped_entries += 1
+                continue
             balance = value_consumption - value_generation
             if balance > 0:
                 output_consumption = {
@@ -203,6 +216,9 @@ class TauronAmiplusStatisticsUpdater:
             balanced_consumption.append(output_consumption)
             balanced_generation.append(output_generation)
 
+        if skipped_entries > 0:
+            _LOGGER.debug("Skipped %s invalid balanced statistics entries with missing EC value", skipped_entries)
+
         return balanced_consumption, balanced_generation
 
     async def update_stats(self, statistic_id, statistic_name, initial_sum, last_stats_time, zone_id, raw_data):
@@ -222,7 +238,10 @@ class TauronAmiplusStatisticsUpdater:
             start = self.get_time(raw_hour)
             if last_stats_time is not None and start <= last_stats_time:
                 continue
-            usage = float(raw_hour["EC"])
+            usage = _safe_float(raw_hour.get("EC"))
+            if usage is None:
+                self.log(f"Skipping statistics entry with invalid EC value: {raw_hour}")
+                continue
             if zone_id is not None and raw_hour["Zone"] != zone_id:
                 usage = 0
             current_sum += usage
