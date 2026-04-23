@@ -62,6 +62,19 @@ TYPE_AMOUNT = "moj_tauron"
 TYPE_AMOUNT_PAYMENT = f"{TYPE_AMOUNT}_PAYMENT"
 
 DEFAULT_UPDATE_INTERVAL = timedelta(hours=8, minutes=30)
+
+
+def get_zone_count(tariff: str) -> int:
+    if tariff is None:
+        return 1
+    tariff_upper = tariff.upper().strip()
+    if tariff_upper.startswith("G13"):
+        return 3
+    if tariff_upper.startswith("G12"):
+        return 2
+    return 1
+
+
 SENSOR_TYPES_YAML = {
     TYPE_CONSUMPTION_READING: {
         "name": "Current consumption reading",

@@ -15,7 +15,7 @@ from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SH
                     CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
                     DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY,
                     TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY,
-                    TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT)
+                    TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT, get_zone_count)
 from .coordinator import TauronAmiplusUpdateCoordinator
 from .typing_helpers import TauronAmiplusConfigEntry
 
@@ -86,6 +86,7 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
     if not show_configurable:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
 
+    zone_count = get_zone_count(tariff)
     for sensor_type, sensor_type_config in sensor_types.items():
         sensors.append(
             TauronAmiplusConfigFlowSensor(
@@ -98,6 +99,20 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
                 meter_name
             )
         )
+        if zone_count > 1 and not sensor_type.startswith(CONST_BALANCED):
+            for zone_id in range(1, zone_count + 1):
+                sensors.append(
+                    TauronAmiplusConfigFlowSensor(
+                    coordinator,
+                    sensor_type_config["name"],
+                    meter_id,
+                    sensor_type,
+                    sensor_type_config["state_class"],
+                    tariff,
+                    meter_name,
+                    zone_id=str(zone_id)
+                    )
+                )
 
     async_add_entities(sensors, True)
 
@@ -116,6 +131,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         self._tariff = None
         self._params = {}
         self._state = None
+        self._zone_id = None
+        self._zone_name = None
 
     @property
     def name(self):
@@ -193,11 +210,27 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
     def update_reading(self, json_data):
         reading = json_data["data"][-1]
+        if self._zone_id is not None:
+            key = f"S{self._zone_id}"
+            if key in reading and reading[key] is not None:
+                self._state = float(reading[key])
+                self._params = {"date": reading["Date"]}
+            return
         self._state = reading["C"]
         partials = {s: reading[s] for s in ["S1", "S2", "S3"] if s in reading and reading[s] is not None}
         self._params = {"date": reading["Date"], **partials}
 
     def update_values(self, json_data):
+        if self._zone_id is not None:
+            zones = json_data["data"].get("zones", {})
+            zones_name = json_data["data"].get("zonesName", {})
+            if self._zone_id in zones:
+                self._state = round(zones[self._zone_id], 3)
+            if self._zone_id in zones_name:
+                self._zone_name = zones_name[self._zone_id]
+            _, _, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
+            self._params = {"data_range": data_range} if data_range else {}
+            return
         total, zones, data_range = TauronAmiplusSensor.get_data_from_json(json_data)
         self._state = total
         self._params = {**zones, "data_range": data_range}
@@ -282,11 +315,12 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
     def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
-                 state_class: SensorStateClass, tariff: str, meter_name: str):
+                 state_class: SensorStateClass, tariff: str, meter_name: str, zone_id: str = None):
         """Initialize the sensor."""
         super().__init__(coordinator, name, meter_id, sensor_type, state_class)
         self._tariff = tariff
         self._meter_name = meter_name
+        self._zone_id = zone_id
 
     @property
     def device_info(self):
@@ -302,9 +336,16 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
     @property
     def name(self):
-        return f"{DEFAULT_NAME} {self._meter_name} {self._client_name}"
+        base = f"{DEFAULT_NAME} {self._meter_name} {self._client_name}"
+        if self._zone_id is None:
+            return base
+        zone_label = self._zone_name or f"Zone {self._zone_id}"
+        return f"{base} {zone_label}"
 
     @property
     def unique_id(self):
         """Return a unique ID."""
-        return f"tauron-{self._meter_id}-{self._sensor_type.lower()}"
+        base = f"tauron-{self._meter_id}-{self._sensor_type.lower()}"
+        if self._zone_id is None:
+            return base
+        return f"{base}-zone-{self._zone_id}"
