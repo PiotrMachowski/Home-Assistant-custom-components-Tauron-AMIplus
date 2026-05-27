@@ -177,41 +177,55 @@ class TauronAmiplusConnector:
             return session, response
 
         self.log(f"Logging in... ({service})")
+
+        # Step 1: GET login page to retrieve the Keycloak form action URL.
+        # TAURON migrated from CAS to Keycloak (OpenID Connect) — old POST /login returns 404.
+        login_page_response = await session.request(
+            "GET",
+            f"{login_url}?service={service}",
+            headers=CONST_REQUEST_HEADERS,
+            allow_redirects=True,
+        )
+        login_page_text = await login_page_response.text()
+        self.log(f"LOGIN PAGE STATUS: {login_page_response.status}")
+
+        form_action_match = re.search(r'<form[^>]+id="kc-form-login"[^>]+action="([^"]+)"', login_page_text)
+        if form_action_match is None:
+            self.log("Keycloak login form not found in response")
+            raise Exception("Failed to find login form")
+        form_action = form_action_match.group(1).replace("&amp;", "&")
+        self.log(f"FORM ACTION: {form_action[:120]}")
+
+        # Step 2: POST credentials to Keycloak, follow redirects back to the service.
         payload_login = {
             "username": self._username,
             "password": self._password,
-            "service": service,
+            "credentialId": "",
         }
-        r1 = await session.request(
+        login_response = await session.request(
             "POST",
-            login_url,
+            form_action,
             data=payload_login,
             headers=CONST_REQUEST_HEADERS,
+            allow_redirects=True,
         )
-        r1_text = await r1.text()
-        self.log(f"RESPONSE 1: {r1_text}")
-        if "Przekroczono maksymalną liczbę logowań." in r1_text:
+        login_response_text = await login_response.text()
+        self.log(f"LOGIN RESPONSE STATUS: {login_response.status}")
+
+        if "Przekroczono maksymalną liczbę logowań." in login_response_text:
             self.log("Too many login attempts")
             raise Exception("Too many login attempts")
-        r2 = await session.request(
-            "POST",
-            login_url,
-            data=payload_login,
-            headers=CONST_REQUEST_HEADERS,
-        )
-        r2_text = await r2.text()
-        self.log(f"RESPONSE 2: {r2_text}")
-        if "Przekroczono maksymalną liczbę logowań." in r2_text:
-            self.log("Too many login attempts")
-            raise Exception("Too many login attempts")
-        if "Login lub hasło są nieprawidłowe." in r2_text:
+        # If we're still on the Keycloak login page, credentials were rejected.
+        if 'id="kc-form-login"' in login_response_text:
             self.log("Invalid credentials")
             raise ConfigEntryAuthFailed("Invalid credentials")
-        if (self._username not in r2_text) and (self._username.upper() not in r2_text):
-            self.log("Failed to login")
+        if (self._username not in login_response_text and
+                self._username.upper() not in login_response_text.upper()):
+            self.log("Failed to login - username not found in response")
             raise Exception("Failed to login")
+
         await self.store_session(session, service)
-        return session, r2_text
+        return session, login_response_text
 
     async def try_restore_session(self, service: str) -> (bool, str | None, ClientSession):
         session = async_create_clientsession(self._hass)
