@@ -394,7 +394,7 @@ class TauronAmiplusConnector:
             if day_data is not None:
                 data["data"]["allData"].extend(day_data["data"]["allData"])
                 data["data"]["sum"] += day_data["data"]["sum"]
-                data["data"]["zonesName"].update(day_data["data"]["zonesName"])
+                data["data"]["zonesName"] = {**(day_data["data"]["zonesName"]), **(data["data"]["zonesName"])}
                 if "tariff" in day_data["data"]:
                     data["data"]["tariff"] = day_data["data"]["tariff"]
                 for z, v in day_data["data"]["zones"].items():
