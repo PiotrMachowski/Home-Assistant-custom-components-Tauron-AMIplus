@@ -30,7 +30,9 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
-          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
+          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)",
+          "show_cost_sensors": "Obliczanie kosztu energii (na podstawie sensora ceny)",
+          "cost_price_entity": "Encja dostarczająca aktualną cenę energii"
         }
       },
       "reauth_confirm": {
@@ -41,7 +43,8 @@
     "error": {
       "server_no_connection": "Nie można połączyć się z serwerem TAURON eLicznik: {error_info}",
       "invalid_meter_id": "Nieprawidłowe ID punktu poboru",
-      "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych"
+      "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych",
+      "missing_cost_entity": "Brak encji ceny dla sensorów kosztu"
     }
   },
   "options": {
@@ -55,12 +58,15 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
-          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
+          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)",
+          "show_cost_sensors": "Obliczanie kosztu energii (na podstawie sensora ceny)",
+          "cost_price_entity": "Encja dostarczająca aktualną cenę energii"
         }
       }
     },
     "error": {
-      "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych"
+      "missing_configurable_start_date": "Nie skonfigurowano początku okresu dla sensorów konfigurowalnych",
+      "missing_cost_entity": "Brak encji ceny dla sensorów kosztu"
     }
   },
   "services": {

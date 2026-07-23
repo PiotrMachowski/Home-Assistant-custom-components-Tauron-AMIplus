@@ -10,8 +10,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import as_utc, get_time_zone, utc_from_timestamp
 
 from .connector import TauronAmiplusConnector, TauronAmiplusRawData
-from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_BALANCED, CONF_SHOW_GENERATION, CONST_BALANCED,
-                    CONST_CONSUMPTION, CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN)
+from .const import (CONF_COST_ENTITY, CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_BALANCED, CONF_SHOW_COST,
+                    CONF_SHOW_GENERATION, CONST_BALANCED, CONST_CONSUMPTION, CONST_COST, CONST_GENERATION,
+                    DEFAULT_NAME, STATISTICS_DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,13 +20,16 @@ _LOGGER = logging.getLogger(__name__)
 class TauronAmiplusStatisticsUpdater:
 
     def __init__(self, hass: HomeAssistant, connector: TauronAmiplusConnector, meter_id: str, meter_name: str,
-                 show_generation: bool, show_balanced: bool) -> None:
+                 show_generation: bool, show_balanced: bool, show_cost: bool = False,
+                 cost_entity_id: str | None = None) -> None:
         self.hass = hass
         self.connector = connector
         self.meter_id = meter_id
         self.meter_name = meter_name
         self.show_generation = show_generation
         self.show_balanced = show_balanced
+        self.show_cost = show_cost
+        self.cost_entity_id = cost_entity_id
 
     @staticmethod
     async def manually_update(hass, start_date: datetime.date, entry) -> None:
@@ -36,10 +40,13 @@ class TauronAmiplusStatisticsUpdater:
 
         show_generation = entry.options.get(CONF_SHOW_GENERATION, False)
         show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
+        show_cost = entry.options.get(CONF_SHOW_COST, False)
+        cost_entity_id = entry.options.get(CONF_COST_ENTITY, None)
 
         connector = TauronAmiplusConnector(username, password, meter_id, hass=hass, config_entry_id=entry.entry_id, show_generation=show_generation,
                                            show_balanced=show_balanced)
-        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, meter_name, show_generation, show_balanced)
+        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, meter_name, show_generation, show_balanced,
+                                                            show_cost, cost_entity_id)
 
         data = await connector.get_raw_data()
         start_date = datetime.datetime.combine(start_date,
@@ -52,6 +59,7 @@ class TauronAmiplusStatisticsUpdater:
             return
         raw_data = {CONST_CONSUMPTION: last_data.consumption.json_last_30_days_hourly["data"]["allData"]}
         zones = last_data.consumption.json_last_30_days_hourly["data"]["zonesName"]
+        self._cost_price = self.get_cost_price() if self.show_cost else None
         if self.show_generation or self.show_balanced:
             if last_data.generation is None or last_data.generation.json_last_30_days_hourly is None:
                 return
@@ -79,6 +87,9 @@ class TauronAmiplusStatisticsUpdater:
             raw_data[f"{CONST_BALANCED}_{CONST_CONSUMPTION}"] = balanced_consumption
             raw_data[f"{CONST_BALANCED}_{CONST_GENERATION}"] = balanced_generation
 
+        if self.show_cost and self._cost_price is not None:
+            raw_data[CONST_COST] = self.prepare_cost_raw_data(raw_data[CONST_CONSUMPTION], self._cost_price)
+
         for s, v in all_stat_ids.items():
             if v["last_stats_end"] is not None:
                 stat = await self.get_stats(raw_data[v["data_source"]], s)
@@ -92,7 +103,8 @@ class TauronAmiplusStatisticsUpdater:
                 v["last_stats_time"] = start
 
         for s, v in all_stat_ids.items():
-            await self.update_stats(s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data[v["data_source"]])
+            await self.update_stats(s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data[v["data_source"]],
+                                    v["data_source"])
 
     async def prepare_stats_ids(self, zones):
         suffixes = [{
@@ -119,6 +131,13 @@ class TauronAmiplusStatisticsUpdater:
                 "id": f"{CONST_BALANCED}_{CONST_GENERATION}",
                 "name": f"{CONST_BALANCED} {CONST_GENERATION}",
                 "data": f"{CONST_BALANCED}_{CONST_GENERATION}",
+                "zone": None
+            })
+        if self.show_cost and self._cost_price is not None:
+            suffixes.append({
+                "id": CONST_COST,
+                "name": CONST_COST,
+                "data": CONST_COST,
                 "zone": None
             })
         if len(zones) > 1:
@@ -205,17 +224,44 @@ class TauronAmiplusStatisticsUpdater:
 
         return balanced_consumption, balanced_generation
 
-    async def update_stats(self, statistic_id, statistic_name, initial_sum, last_stats_time, zone_id, raw_data):
+    def get_cost_price(self) -> float | None:
+        if self.cost_entity_id is None:
+            return None
+        state = self.hass.states.get(self.cost_entity_id)
+        if state is None or state.state in (None, "unknown", "unavailable"):
+            self.log(f"Cost price entity {self.cost_entity_id} is unavailable, skipping cost statistics")
+            return None
+        try:
+            return float(state.state)
+        except ValueError:
+            self.log(f"Cost price entity {self.cost_entity_id} has a non-numeric state, skipping cost statistics")
+            return None
+
+    @staticmethod
+    def prepare_cost_raw_data(consumption_data, price: float) -> list:
+        return [
+            {
+                "EC": f'{round(float(entry["EC"]) * price, 4)}',
+                "Date": entry["Date"],
+                "Hour": entry["Hour"],
+                "Zone": entry["Zone"],
+            }
+            for entry in consumption_data
+        ]
+
+    async def update_stats(self, statistic_id, statistic_name, initial_sum, last_stats_time, zone_id, raw_data,
+                           data_source=CONST_CONSUMPTION):
         current_sum = initial_sum
+        is_cost = data_source == CONST_COST
         metadata: StatisticMetaData = {
             "has_mean": False,
             "has_sum": True,
             "name": statistic_name,
             "source": STATISTICS_DOMAIN,
             "statistic_id": statistic_id,
-            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+            "unit_of_measurement": self.hass.config.currency if is_cost else UnitOfEnergy.KILO_WATT_HOUR,
             "mean_type": StatisticMeanType.NONE,
-            "unit_class": "energy",
+            "unit_class": None if is_cost else "energy",
         }
         statistic_data = []
         for raw_hour in raw_data:
