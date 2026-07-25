@@ -94,6 +94,10 @@ class TauronAmiplusStatisticsUpdater:
             if v["data_source"] == CONST_COST and start_date is None:
                 # Cost entries are never recalculated once written (a later price change must not
                 # rewrite history) - only append hours strictly after the last recorded one.
+                # Trade-off: unlike consumption/generation/balanced, cost does not self-heal if
+                # Tauron later revises a past hour's usage (e.g. meter lag) - the stale cost for
+                # that hour is not corrected automatically. Use the download_statistics service
+                # with an explicit start_date to force a manual recompute if that ever happens.
                 v["sum"] = v["last_stats_sum"]
                 v["last_stats_time"] = v["last_stats_end"]
             elif v["last_stats_end"] is not None:
