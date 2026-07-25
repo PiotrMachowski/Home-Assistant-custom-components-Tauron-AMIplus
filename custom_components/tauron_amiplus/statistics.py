@@ -91,7 +91,12 @@ class TauronAmiplusStatisticsUpdater:
             raw_data[CONST_COST] = self.prepare_cost_raw_data(raw_data[CONST_CONSUMPTION], self._cost_price)
 
         for s, v in all_stat_ids.items():
-            if v["last_stats_end"] is not None:
+            if v["data_source"] == CONST_COST and start_date is None:
+                # Cost entries are never recalculated once written (a later price change must not
+                # rewrite history) - only append hours strictly after the last recorded one.
+                v["sum"] = v["last_stats_sum"]
+                v["last_stats_time"] = v["last_stats_end"]
+            elif v["last_stats_end"] is not None:
                 stat = await self.get_stats(raw_data[v["data_source"]], s)
                 v["sum"] = stat[s][0]["sum"]
                 start = stat[s][0]["start"]
@@ -159,12 +164,13 @@ class TauronAmiplusStatisticsUpdater:
                 "data_source": s["data"],
                 "sum": 0,
                 "last_stats_time": None,
-                "last_stats_end": None
+                "last_stats_end": None,
+                "last_stats_sum": 0,
             }
             for s in suffixes
         }
         for k, v in all_stat_ids.items():
-            v["last_stats_end"] = await self.get_last_stats_date(k)
+            v["last_stats_end"], v["last_stats_sum"] = await self.get_last_stats_end_and_sum(k)
         return all_stat_ids
 
     def get_stats_id(self, suffix):
@@ -281,14 +287,15 @@ class TauronAmiplusStatisticsUpdater:
         async_add_external_statistics(self.hass, metadata, statistic_data)
         self.log(f"Updated {len(statistic_data)} entries for statistic: {statistic_id} ")
 
-    async def get_last_stats_date(self, statistic_id):
+    async def get_last_stats_end_and_sum(self, statistic_id):
         last_stats = await self.get_last_stats(statistic_id)
         if statistic_id in last_stats and len(last_stats[statistic_id]) > 0:
-            end = last_stats[statistic_id][0]["end"]
+            entry = last_stats[statistic_id][0]
+            end = entry["end"]
             if isinstance(end, float):
                 end = utc_from_timestamp(end)
-            return end
-        return None
+            return end, entry.get("sum") or 0
+        return None, 0
 
     async def get_last_stats(self, statistic_id):
         return await get_instance(self.hass).async_add_executor_job(
