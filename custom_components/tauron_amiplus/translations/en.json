@@ -92,6 +92,10 @@
         "device_id": {
           "name": "Target device",
           "description": "The device to recalculate cost statistics for."
+        },
+        "start_date": {
+          "name": "Start date",
+          "description": "Start date to recalculate cost statistics from. Defaults to the full retained history (~1 year back) if not set."
         }
       }
     },

@@ -91,6 +91,10 @@
         "device_id": {
           "name": "Docelowe urządzenie",
           "description": "Urządzenie, dla którego zostaną przeliczone statystyki kosztu."
+        },
+        "start_date": {
+          "name": "Data początkowa",
+          "description": "Data, od której mają zostać przeliczone statystyki kosztu. Jeśli nie podano, domyślnie cała dostępna historia (~rok wstecz)."
         }
       }
     },

@@ -30,6 +30,12 @@ force_price_recalculation:
         device:
           filter:
             - integration: tauron_amiplus
+    start_date:
+      name: Start date
+      description: Start date to recalculate cost statistics from. Defaults to the full retained history (~1 year back) if not set.
+      required: false
+      selector:
+        date:
 
 clear_cache:
   description: >
