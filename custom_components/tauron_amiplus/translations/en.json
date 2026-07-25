@@ -85,6 +85,16 @@
         }
       }
     },
+    "force_price_recalculation": {
+      "name": "Force price recalculation",
+      "description": "Forces cost statistics to be recalculated using the current price sensor value.",
+      "fields": {
+        "device_id": {
+          "name": "Target device",
+          "description": "The device to recalculate cost statistics for."
+        }
+      }
+    },
     "clear_cache": {
       "name": "Clear cache",
       "description": "Clear cache for a given meter.",

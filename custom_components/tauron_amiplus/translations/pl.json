@@ -84,6 +84,16 @@
         }
       }
     },
+    "force_price_recalculation": {
+      "name": "Wymuś przeliczenie ceny",
+      "description": "Wymusza ponowne przeliczenie statystyk kosztu z użyciem aktualnej wartości sensora ceny.",
+      "fields": {
+        "device_id": {
+          "name": "Docelowe urządzenie",
+          "description": "Urządzenie, dla którego zostaną przeliczone statystyki kosztu."
+        }
+      }
+    },
     "clear_cache": {
       "name": "Wyczyść cache",
       "description": "Czyści cache dla wybranego urządzenia.",

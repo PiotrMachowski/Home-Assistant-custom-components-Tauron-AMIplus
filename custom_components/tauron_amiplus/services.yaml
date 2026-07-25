@@ -17,6 +17,20 @@ download_statistics:
       selector:
         date:
 
+force_price_recalculation:
+  description: >
+    Forces cost statistics to be recalculated using the current price sensor value.
+    Only affects meters with cost statistics enabled.
+  fields:
+    device_id:
+      name: Target device
+      description: The device to recalculate cost statistics for.
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: tauron_amiplus
+
 clear_cache:
   description: >
     Clear cache for a given meter.
