@@ -30,7 +30,9 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
-          "store_statistics": "Store hourly statistics (for Energy dashboard)"
+          "store_statistics": "Store hourly statistics (for Energy dashboard)",
+          "show_cost_sensors": "Enable calculating energy cost (using a price sensor)",
+          "cost_price_entity": "Entity providing the current energy price"
         }
       },
       "reauth_confirm": {
@@ -41,7 +43,8 @@
     "error": {
       "server_no_connection": "Cannot connect to TAURON eLicznik server: {error_info}",
       "invalid_meter_id": "Invalid energy meter ID",
-      "missing_configurable_start_date": "Missing start date for configurable sensors"
+      "missing_configurable_start_date": "Missing start date for configurable sensors",
+      "missing_cost_entity": "Missing price entity for cost sensors"
     }
   },
   "options": {
@@ -56,12 +59,15 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
-          "store_statistics": "Store hourly statistics (for Energy dashboard)"
+          "store_statistics": "Store hourly statistics (for Energy dashboard)",
+          "show_cost_sensors": "Enable calculating energy cost (using a price sensor)",
+          "cost_price_entity": "Entity providing the current energy price"
         }
       }
     },
     "error": {
-      "missing_configurable_start_date": "Missing start date for configurable sensors"
+      "missing_configurable_start_date": "Missing start date for configurable sensors",
+      "missing_cost_entity": "Missing price entity for cost sensors"
     }
   },
   "services": {
@@ -76,6 +82,20 @@
         "start_date": {
           "name": "Start date",
           "description": "Start date of statistics to download."
+        }
+      }
+    },
+    "force_price_recalculation": {
+      "name": "Force price recalculation",
+      "description": "Forces cost statistics to be recalculated using the current price sensor value.",
+      "fields": {
+        "device_id": {
+          "name": "Target device",
+          "description": "The device to recalculate cost statistics for."
+        },
+        "start_date": {
+          "name": "Start date",
+          "description": "Start date to recalculate cost statistics from. Defaults to the full retained history (~1 year back) if not set."
         }
       }
     },

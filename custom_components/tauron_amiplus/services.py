@@ -9,7 +9,7 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN
+from .const import CONF_SHOW_COST, DOMAIN
 from .statistics import TauronAmiplusStatisticsUpdater
 from .typing_helpers import TauronAmiplusConfigEntry
 
@@ -44,6 +44,37 @@ class DownloadStatisticsService:
         await TauronAmiplusStatisticsUpdater.manually_update(self._hass, start_date, config_entry)
 
 
+class ForcePriceRecalculationService:
+
+    domain = DOMAIN
+    service = "force_price_recalculation"
+    schema = vol.Schema({
+        vol.Required("device_id"): cv.string,
+        vol.Optional("start_date"): cv.date,
+    })
+
+    def __init__(self, hass: HomeAssistant):
+        self._hass = hass
+
+    async def async_handle_service(self, call: ServiceCall) -> None:
+        today = datetime.date.today()
+        start_date = call.data.get("start_date")
+        if start_date is not None and start_date > today:
+            _LOGGER.error(f"Failed to force price recalculation, date from the future: {start_date}")
+            return
+        device_registry = dr.async_get(self._hass)
+        device = device_registry.async_get(call.data["device_id"])
+        [config_entry_id, *_] = device.config_entries
+        config_entry: TauronAmiplusConfigEntry = self._hass.config_entries.async_get_entry(config_entry_id)
+        if not config_entry.options.get(CONF_SHOW_COST, False):
+            _LOGGER.error("Cannot force price recalculation, cost statistics are not enabled for this meter")
+            return
+        if start_date is None:
+            now = datetime.datetime.now()
+            start_date = (now - datetime.timedelta(365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0).date()
+        await TauronAmiplusStatisticsUpdater.manually_update(self._hass, start_date, config_entry)
+
+
 class ClearCacheService:
 
     domain = DOMAIN
@@ -64,6 +95,6 @@ class ClearCacheService:
 
 
 def register_all_services(hass: HomeAssistant) -> None:
-    services = [DownloadStatisticsService(hass), ClearCacheService(hass)]
+    services = [DownloadStatisticsService(hass), ForcePriceRecalculationService(hass), ClearCacheService(hass)]
     for service in services:
         hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
