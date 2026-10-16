@@ -5,7 +5,8 @@ import logging
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy
+from homeassistant.const import (CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, EntityCategory,
+                                 UnitOfEnergy)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .connector import TauronAmiplusRawData
@@ -18,6 +19,7 @@ from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SH
                     TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT)
 from .coordinator import TauronAmiplusUpdateCoordinator
 from .typing_helpers import TauronAmiplusConfigEntry
+from .zones import get_zones
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,6 +100,8 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
                 meter_name
             )
         )
+
+    sensors.append(TauronAmiplusZonesSensor(coordinator, meter_id, meter_name, tariff))
 
     async_add_entities(sensors, True)
 
@@ -296,7 +300,6 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "manufacturer": "TAURON",
             "model": self._meter_id,
             "sw_version": f"Tariff {self._tariff}",
-            "via_device": None,
             "configuration_url": CONST_URL_SERVICE,
         }
 
@@ -308,3 +311,45 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
     def unique_id(self):
         """Return a unique ID."""
         return f"tauron-{self._meter_id}-{self._sensor_type.lower()}"
+
+
+class TauronAmiplusZonesSensor(CoordinatorEntity, SensorEntity):
+    """Diagnostic sensor listing tariff zones reported by TAURON (for setting energy prices)."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:clock-time-eight-outline"
+
+    def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, meter_id: str, meter_name: str, tariff: str):
+        super().__init__(coordinator)
+        self._meter_id = meter_id
+        self._meter_name = meter_name
+        self._tariff = tariff
+
+    @property
+    def name(self):
+        return f"{DEFAULT_NAME} {self._meter_name} zones"
+
+    @property
+    def unique_id(self):
+        return f"tauron-{self._meter_id}-zones"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._meter_id)},
+            "name": f"{DEFAULT_NAME} {self._meter_name}",
+            "manufacturer": "TAURON",
+            "model": self._meter_id,
+            "sw_version": f"Tariff {self._tariff}",
+            "configuration_url": CONST_URL_SERVICE,
+        }
+
+    @property
+    def native_value(self):
+        zones = get_zones(self.coordinator.data)
+        return len(zones) if zones else None
+
+    @property
+    def extra_state_attributes(self):
+        return {"tariff": self._tariff, "zones": get_zones(self.coordinator.data)}
+

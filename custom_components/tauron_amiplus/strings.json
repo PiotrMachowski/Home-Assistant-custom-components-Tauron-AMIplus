@@ -30,7 +30,8 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
-          "store_statistics": "Store hourly statistics (for Energy dashboard)"
+          "store_statistics": "Store hourly statistics (for Energy dashboard)",
+          "show_cost_sensors": "Enable calculating energy cost"
         }
       },
       "reauth_confirm": {
@@ -56,7 +57,8 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
-          "store_statistics": "Store hourly statistics (for Energy dashboard)"
+          "store_statistics": "Store hourly statistics (for Energy dashboard)",
+          "show_cost_sensors": "Enable calculating energy cost"
         }
       }
     },
@@ -76,6 +78,20 @@
         "start_date": {
           "name": "Start date",
           "description": "Start date of statistics to download."
+        }
+      }
+    },
+    "force_price_recalculation": {
+      "name": "Force price recalculation",
+      "description": "Forces cost statistics to be recalculated using the current energy prices.",
+      "fields": {
+        "device_id": {
+          "name": "Target device",
+          "description": "The device to recalculate cost statistics for."
+        },
+        "start_date": {
+          "name": "Start date",
+          "description": "Start date to recalculate cost statistics from. Defaults to the full retained history (~1 year back) if not set."
         }
       }
     },

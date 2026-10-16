@@ -4,7 +4,7 @@ from datetime import timedelta
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import Platform
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.NUMBER]
 DOMAIN = "tauron_amiplus"
 STATISTICS_DOMAIN = "tauron_importer"
 DEFAULT_NAME = "Tauron AMIplus"
@@ -19,6 +19,7 @@ CONF_SHOW_12_MONTHS = "show_12_months_sensors"
 CONF_SHOW_CONFIGURABLE = "show_configurable_sensors"
 CONF_SHOW_CONFIGURABLE_DATE = "show_configurable_sensors_date"
 CONF_STORE_STATISTICS = "store_statistics"
+CONF_SHOW_COST = "show_cost_sensors"
 CONST_DATE_FORMAT = "%d.%m.%Y"
 CONST_MAX_LOOKUP_RANGE = 7
 CONST_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"
@@ -33,6 +34,7 @@ CONST_REQUEST_HEADERS = {"cache-control": "no-cache"}
 CONST_CONSUMPTION = "consumption"
 CONST_GENERATION = "generation"
 CONST_BALANCED = "balanced"
+CONST_COST = "cost"
 CONST_READING = "reading"
 CONST_DAILY = "daily"
 CONST_MONTHLY = "monthly"

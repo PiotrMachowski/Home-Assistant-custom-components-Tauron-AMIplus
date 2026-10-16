@@ -144,6 +144,28 @@ Then restart Home Assistant before applying configuration file changes.
 
   Once the data appears on [eLicznik website](https://elicznik.tauron-dystrybucja.pl) can fill such gaps using `tauron_amiplus.download_statistics` service.
 
+* **How to show energy cost in Energy dashboard?**
+
+  Enable *calculating energy cost* in the integration options, then set energy prices using `number` entities
+  in the *Configuration* section of the meter device:
+  * `Price <zone name>` - price of 1 kWh, one entity for every tariff zone of your meter (G11 has one, G12 two, G13 three).
+    Zone entities are created after the first data download. Cost is calculated when every zone has a price.
+  * `Monthly fee` - optional, spread evenly over the hours of the month (in the months with DST change
+    the number of hours differs). It is added to every downloaded hour, so hours missing in eLicznik data are not charged.
+
+  The cost of an hour is `consumption * price of the hour's zone + fixed monthly fee / hours in the month`.
+  Results are stored as the `tauron_importer:<meter>_cost` statistic (plus one per tariff zone) - select it as
+  *Use an entity tracking the total costs* for the `tauron_importer:<meter>_consumption` statistic in Energy dashboard.
+
+  The diagnostic *Zones* sensor lists tariff zones of your meter (e.g. `'1': Cała doba (T1)` for G11).
+  If cost is not calculated (e.g. a zone has no price) a warning is logged. Changing prices does not reload the
+  integration.
+
+  Already stored hours are never rewritten on a regular update, so a price change affects only hours downloaded later:
+  change the price on the day a new tariff starts (hours are downloaded with about a day of delay, so the switch is
+  approximate by that much) and history stays as it was. To apply the current prices to history use
+  `tauron_amiplus.force_price_recalculation`. Dynamic tariffs (prices changing every hour) are not supported.
+
 * **When does this integration update data?**
 
   This integration logs in and downloads data from eLicznik website every 8.5h.

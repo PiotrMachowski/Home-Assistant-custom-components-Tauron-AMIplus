@@ -30,7 +30,8 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
-          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
+          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)",
+          "show_cost_sensors": "Obliczanie kosztu energii"
         }
       },
       "reauth_confirm": {
@@ -55,7 +56,8 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
-          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
+          "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)",
+          "show_cost_sensors": "Obliczanie kosztu energii"
         }
       }
     },
@@ -75,6 +77,20 @@
         "start_date": {
           "name": "Data początkowa.",
           "description": "Data, od której będą pobrane statystyki."
+        }
+      }
+    },
+    "force_price_recalculation": {
+      "name": "Wymuś przeliczenie ceny",
+      "description": "Wymusza ponowne przeliczenie statystyk kosztu z użyciem aktualnych cen energii.",
+      "fields": {
+        "device_id": {
+          "name": "Docelowe urządzenie",
+          "description": "Urządzenie, dla którego zostaną przeliczone statystyki kosztu."
+        },
+        "start_date": {
+          "name": "Data początkowa",
+          "description": "Data, od której mają zostać przeliczone statystyki kosztu. Jeśli nie podano, domyślnie cała dostępna historia (~rok wstecz)."
         }
       }
     },
