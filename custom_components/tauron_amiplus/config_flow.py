@@ -19,6 +19,8 @@ from .const import (
     CONF_SHOW_CONFIGURABLE,
     CONF_SHOW_CONFIGURABLE_DATE,
     CONF_SHOW_GENERATION,
+    CONF_SHOW_NET_BILLING,
+    CONF_SHOW_REACTIVE,
     CONF_STORE_STATISTICS,
     CONF_TARIFF,
     DOMAIN,
@@ -173,6 +175,8 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_SHOW_CONFIGURABLE_DATE: user_input.get(
                         CONF_SHOW_CONFIGURABLE_DATE, None
                     ),
+                    CONF_SHOW_REACTIVE: user_input.get(CONF_SHOW_REACTIVE, False),
+                    CONF_SHOW_NET_BILLING: user_input.get(CONF_SHOW_NET_BILLING, False),
                     CONF_STORE_STATISTICS: user_input.get(CONF_STORE_STATISTICS, True),
                 }
 
@@ -272,6 +276,14 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     default=user_input.get(CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED),
                 ): selector({"date": {}}),
                 vol.Required(
+                    CONF_SHOW_REACTIVE,
+                    default=user_input.get(CONF_SHOW_REACTIVE, vol.UNDEFINED),
+                ): bool,
+                vol.Required(
+                    CONF_SHOW_NET_BILLING,
+                    default=user_input.get(CONF_SHOW_NET_BILLING, vol.UNDEFINED),
+                ): bool,
+                vol.Required(
                     CONF_STORE_STATISTICS,
                     default=user_input.get(CONF_STORE_STATISTICS, True),
                 ): bool,
@@ -353,6 +365,14 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_SHOW_CONFIGURABLE_DATE, vol.UNDEFINED
                         ),
                     ): selector({"date": {}}),
+                    vol.Required(
+                        CONF_SHOW_REACTIVE,
+                        default=self.get_option(CONF_SHOW_REACTIVE, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_SHOW_NET_BILLING,
+                        default=self.get_option(CONF_SHOW_NET_BILLING, False),
+                    ): bool,
                     vol.Required(
                         CONF_STORE_STATISTICS,
                         default=self.get_option(CONF_STORE_STATISTICS, True),

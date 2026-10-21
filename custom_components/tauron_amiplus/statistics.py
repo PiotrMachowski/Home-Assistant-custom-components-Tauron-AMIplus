@@ -10,8 +10,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.dt import as_utc, get_time_zone, utc_from_timestamp
 
 from .connector import TauronAmiplusConnector, TauronAmiplusRawData
-from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_BALANCED, CONF_SHOW_GENERATION, CONST_BALANCED,
-                    CONST_CONSUMPTION, CONST_GENERATION, DEFAULT_NAME, STATISTICS_DOMAIN)
+from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_BALANCED, CONF_SHOW_GENERATION, CONF_SHOW_NET_BILLING,
+                    CONF_SHOW_REACTIVE, CONST_BALANCED, CONST_CONSUMPTION, CONST_GENERATION, CONST_NET_CONSUMPTION,
+                    CONST_NET_GENERATION, CONST_REACTIVE_CAPACITIVE, CONST_REACTIVE_INDUCTIVE, DEFAULT_NAME,
+                    STATISTICS_DOMAIN, UNIT_INFO_BY_DATA_KIND)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,13 +21,16 @@ _LOGGER = logging.getLogger(__name__)
 class TauronAmiplusStatisticsUpdater:
 
     def __init__(self, hass: HomeAssistant, connector: TauronAmiplusConnector, meter_id: str, meter_name: str,
-                 show_generation: bool, show_balanced: bool) -> None:
+                 show_generation: bool, show_balanced: bool, show_reactive: bool = False,
+                 show_net_billing: bool = False) -> None:
         self.hass = hass
         self.connector = connector
         self.meter_id = meter_id
         self.meter_name = meter_name
         self.show_generation = show_generation
         self.show_balanced = show_balanced
+        self.show_reactive = show_reactive
+        self.show_net_billing = show_net_billing
 
     @staticmethod
     async def manually_update(hass, start_date: datetime.date, entry) -> None:
@@ -36,10 +41,14 @@ class TauronAmiplusStatisticsUpdater:
 
         show_generation = entry.options.get(CONF_SHOW_GENERATION, False)
         show_balanced = entry.options.get(CONF_SHOW_BALANCED, False)
+        show_reactive = entry.options.get(CONF_SHOW_REACTIVE, False)
+        show_net_billing = entry.options.get(CONF_SHOW_NET_BILLING, False)
 
         connector = TauronAmiplusConnector(username, password, meter_id, hass=hass, config_entry_id=entry.entry_id, show_generation=show_generation,
-                                           show_balanced=show_balanced)
-        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, meter_name, show_generation, show_balanced)
+                                           show_balanced=show_balanced, show_reactive=show_reactive,
+                                           show_net_billing=show_net_billing)
+        statistics_updater = TauronAmiplusStatisticsUpdater(hass, connector, meter_id, meter_name, show_generation, show_balanced,
+                                                            show_reactive, show_net_billing)
 
         data = await connector.get_raw_data()
         start_date = datetime.datetime.combine(start_date,
@@ -56,6 +65,22 @@ class TauronAmiplusStatisticsUpdater:
             if last_data.generation is None or last_data.generation.json_last_30_days_hourly is None:
                 return
             raw_data[CONST_GENERATION] = last_data.generation.json_last_30_days_hourly["data"]["allData"]
+        if self.show_reactive:
+            for data_type, dataset in (
+                (CONST_REACTIVE_INDUCTIVE, last_data.reactive_inductive),
+                (CONST_REACTIVE_CAPACITIVE, last_data.reactive_capacitive),
+            ):
+                if dataset is None or dataset.json_last_30_days_hourly is None:
+                    return
+                raw_data[data_type] = dataset.json_last_30_days_hourly["data"]["allData"]
+        if self.show_net_billing:
+            for data_type, dataset in (
+                (CONST_NET_CONSUMPTION, last_data.net_consumption),
+                (CONST_NET_GENERATION, last_data.net_generation),
+            ):
+                if dataset is None or dataset.json_last_30_days_hourly is None:
+                    return
+                raw_data[data_type] = dataset.json_last_30_days_hourly["data"]["allData"]
 
         all_stat_ids = await self.prepare_stats_ids(zones)
 
@@ -66,13 +91,23 @@ class TauronAmiplusStatisticsUpdater:
                 start_range = (now - datetime.timedelta(365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             else:
                 start_range = start_date.replace(tzinfo=None)
-            data_consumption = await self.connector.get_raw_values_daily_for_range(start_range, now, False)
+            data_consumption = await self.connector.get_raw_values_daily_for_range(start_range, now, CONST_CONSUMPTION)
             if data_consumption is not None:
                 raw_data[CONST_CONSUMPTION] = data_consumption["data"]["allData"]
             if self.show_generation or self.show_balanced:
-                data_generation = await self.connector.get_raw_values_daily_for_range(start_range, now, True)
+                data_generation = await self.connector.get_raw_values_daily_for_range(start_range, now, CONST_GENERATION)
                 if data_generation is not None:
                     raw_data[CONST_GENERATION] = data_generation["data"]["allData"]
+            if self.show_reactive:
+                for data_type in (CONST_REACTIVE_INDUCTIVE, CONST_REACTIVE_CAPACITIVE):
+                    data_reactive = await self.connector.get_raw_values_daily_for_range(start_range, now, data_type)
+                    if data_reactive is not None:
+                        raw_data[data_type] = data_reactive["data"]["allData"]
+            if self.show_net_billing:
+                for data_type in (CONST_NET_CONSUMPTION, CONST_NET_GENERATION):
+                    data_net = await self.connector.get_raw_values_daily_for_range(start_range, now, data_type)
+                    if data_net is not None:
+                        raw_data[data_type] = data_net["data"]["allData"]
 
         if self.show_balanced:
             balanced_consumption, balanced_generation = self.prepare_balanced_raw_data(raw_data)
@@ -92,7 +127,8 @@ class TauronAmiplusStatisticsUpdater:
                 v["last_stats_time"] = start
 
         for s, v in all_stat_ids.items():
-            await self.update_stats(s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data[v["data_source"]])
+            await self.update_stats(s, v["name"], v["sum"], v["last_stats_time"], v["zone"], raw_data[v["data_source"]],
+                                    v["data_source"])
 
     async def prepare_stats_ids(self, zones):
         suffixes = [{
@@ -106,6 +142,32 @@ class TauronAmiplusStatisticsUpdater:
                 "id": CONST_GENERATION,
                 "name": CONST_GENERATION,
                 "data": CONST_GENERATION,
+                "zone": None
+            })
+        if self.show_reactive:
+            suffixes.append({
+                "id": CONST_REACTIVE_INDUCTIVE,
+                "name": CONST_REACTIVE_INDUCTIVE,
+                "data": CONST_REACTIVE_INDUCTIVE,
+                "zone": None
+            })
+            suffixes.append({
+                "id": CONST_REACTIVE_CAPACITIVE,
+                "name": CONST_REACTIVE_CAPACITIVE,
+                "data": CONST_REACTIVE_CAPACITIVE,
+                "zone": None
+            })
+        if self.show_net_billing:
+            suffixes.append({
+                "id": CONST_NET_CONSUMPTION,
+                "name": CONST_NET_CONSUMPTION,
+                "data": CONST_NET_CONSUMPTION,
+                "zone": None
+            })
+            suffixes.append({
+                "id": CONST_NET_GENERATION,
+                "name": CONST_NET_GENERATION,
+                "data": CONST_NET_GENERATION,
                 "zone": None
             })
         if self.show_balanced:
@@ -205,17 +267,21 @@ class TauronAmiplusStatisticsUpdater:
 
         return balanced_consumption, balanced_generation
 
-    async def update_stats(self, statistic_id, statistic_name, initial_sum, last_stats_time, zone_id, raw_data):
+    async def update_stats(self, statistic_id, statistic_name, initial_sum, last_stats_time, zone_id, raw_data,
+                           data_source: str = CONST_CONSUMPTION):
         current_sum = initial_sum
+        unit_of_measurement, _, unit_class = UNIT_INFO_BY_DATA_KIND.get(
+            data_source, (UnitOfEnergy.KILO_WATT_HOUR, None, "energy")
+        )
         metadata: StatisticMetaData = {
             "has_mean": False,
             "has_sum": True,
             "name": statistic_name,
             "source": STATISTICS_DOMAIN,
             "statistic_id": statistic_id,
-            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+            "unit_of_measurement": unit_of_measurement,
             "mean_type": StatisticMeanType.NONE,
-            "unit_class": "energy",
+            "unit_class": unit_class,
         }
         statistic_data = []
         for raw_hour in raw_data:

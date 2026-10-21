@@ -10,12 +10,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .connector import TauronAmiplusRawData
 from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
-                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF,
-                    CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
-                    CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
-                    DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY,
-                    TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY,
-                    TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT)
+                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_SHOW_NET_BILLING,
+                    CONF_SHOW_REACTIVE, CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_CONSUMPTION,
+                    CONST_DAILY, CONST_GENERATION, CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_NET_CONSUMPTION,
+                    CONST_NET_GENERATION, CONST_READING, CONST_REACTIVE_CAPACITIVE, CONST_REACTIVE_INDUCTIVE,
+                    CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME, DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML,
+                    TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY, TYPE_BALANCED_LAST_12_MONTHS,
+                    TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY, TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT,
+                    UNIT_INFO_BY_DATA_KIND)
 from .coordinator import TauronAmiplusUpdateCoordinator
 from .typing_helpers import TauronAmiplusConfigEntry
 
@@ -68,6 +70,8 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
     show_balanced_year = entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
     show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+    show_reactive = entry.options.get(CONF_SHOW_REACTIVE, False)
+    show_net_billing = entry.options.get(CONF_SHOW_NET_BILLING, False)
     if show_configurable_date is None:
         show_configurable = False
 
@@ -85,6 +89,16 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_LAST_12_MONTHS)}
     if not show_configurable:
         sensor_types = {k: v for k, v in sensor_types.items() if not k.endswith(CONST_CONFIGURABLE)}
+    if not show_reactive:
+        sensor_types = {
+            k: v for k, v in sensor_types.items()
+            if not (k.startswith(CONST_REACTIVE_INDUCTIVE) or k.startswith(CONST_REACTIVE_CAPACITIVE))
+        }
+    if not show_net_billing:
+        sensor_types = {
+            k: v for k, v in sensor_types.items()
+            if not (k.startswith(CONST_NET_CONSUMPTION) or k.startswith(CONST_NET_GENERATION))
+        }
 
     for sensor_type, sensor_type_config in sensor_types.items():
         sensors.append(
@@ -109,7 +123,20 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         super().__init__(coordinator)
         self._client_name = name
         self._meter_id = meter_id
-        self._generation = sensor_type.startswith(CONST_GENERATION)
+        self._data_kind = next(
+            (
+                kind for kind in (
+                    CONST_GENERATION,
+                    CONST_REACTIVE_INDUCTIVE,
+                    CONST_REACTIVE_CAPACITIVE,
+                    CONST_NET_CONSUMPTION,
+                    CONST_NET_GENERATION,
+                    CONST_CONSUMPTION,
+                )
+                if sensor_type.startswith(kind)
+            ),
+            CONST_CONSUMPTION,
+        )
         self._sensor_type = sensor_type
         self._state_class = state_class
         self._power_zones = None
@@ -125,13 +152,19 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     def native_unit_of_measurement(self):
         if self._sensor_type == TYPE_AMOUNT_PAYMENT:
             return "zł"
-        return UnitOfEnergy.KILO_WATT_HOUR
+        unit_of_measurement, _, _ = UNIT_INFO_BY_DATA_KIND.get(
+            self._data_kind, (UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, "energy")
+        )
+        return unit_of_measurement
 
     @property
     def device_class(self):
         if self._sensor_type.startswith(TYPE_AMOUNT):
             return None
-        return SensorDeviceClass.ENERGY
+        _, device_class, _ = UNIT_INFO_BY_DATA_KIND.get(
+            self._data_kind, (UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, "energy")
+        )
+        return device_class
 
     @property
     def native_value(self):
@@ -159,7 +192,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         self.log(f"DATA: {data}")
         if not self.available or data is None:
             return
-        dataset = data.generation if self._generation else data.consumption
+        dataset = getattr(data, self._data_kind)
         self._tariff = data.tariff
 
         if self._sensor_type == TYPE_AMOUNT_PAYMENT and len(data.payments)>0:

@@ -28,13 +28,15 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
             show_balanced_year: bool = False,
             show_configurable: bool = False,
             show_configurable_date: datetime.date | None = None,
+            show_reactive: bool = False,
+            show_net_billing: bool = False,
             store_statistics: bool = False,
     ):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=DEFAULT_UPDATE_INTERVAL,
                          update_method=self.update_method)
         self.connector = TauronAmiplusConnector(username, password, meter_id, hass, config_entry_id, show_generation, show_12_months,
                                                 show_balanced, show_balanced_year, show_configurable,
-                                                show_configurable_date)
+                                                show_configurable_date, show_reactive, show_net_billing)
         self.meter_id = meter_id
         self.meter_name = meter_name
         self.show_generation = show_generation
@@ -42,6 +44,8 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
         self.show_balanced = show_balanced
         self.show_configurable = show_configurable
         self.show_configurable_date = show_configurable_date
+        self.show_reactive = show_reactive
+        self.show_net_billing = show_net_billing
         self.store_statistics = store_statistics
 
     async def update_method(self) -> TauronAmiplusRawData:
@@ -56,7 +60,8 @@ class TauronAmiplusUpdateCoordinator(DataUpdateCoordinator[TauronAmiplusRawData]
 
     async def generate_statistics(self, data):
         statistics_updater = TauronAmiplusStatisticsUpdater(self.hass, self.connector, self.meter_id, self.meter_name,
-                                                            self.show_generation, self.show_balanced)
+                                                            self.show_generation, self.show_balanced,
+                                                            self.show_reactive, self.show_net_billing)
         await statistics_updater.update_all(data)
 
     async def _update(self) -> TauronAmiplusRawData:

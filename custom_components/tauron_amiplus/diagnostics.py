@@ -3,8 +3,8 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from .const import (CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
-                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS,
-                    CONF_TARIFF)
+                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_SHOW_NET_BILLING,
+                    CONF_SHOW_REACTIVE, CONF_STORE_STATISTICS, CONF_TARIFF)
 from .typing_helpers import TauronAmiplusConfigEntry
 
 
@@ -20,6 +20,8 @@ async def get_config_entry_diagnostics(hass: HomeAssistant, entry: TauronAmiplus
     show_balanced_year = entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
     show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, False)
+    show_reactive = entry.options.get(CONF_SHOW_REACTIVE, False)
+    show_net_billing = entry.options.get(CONF_SHOW_NET_BILLING, False)
     store_statistics = entry.options.get(CONF_STORE_STATISTICS, False)
 
     connector = entry.runtime_data.coordinator.connector
@@ -33,6 +35,8 @@ async def get_config_entry_diagnostics(hass: HomeAssistant, entry: TauronAmiplus
         "show_balanced_year": show_balanced_year,
         "show_configurable": show_configurable,
         "show_configurable_date": show_configurable_date,
+        "show_reactive": show_reactive,
+        "show_net_billing": show_net_billing,
         "store_statistics": store_statistics,
         "raw_data_tariff": raw_data.tariff,
         "raw_data_consumption": {
@@ -52,5 +56,37 @@ async def get_config_entry_diagnostics(hass: HomeAssistant, entry: TauronAmiplus
             "json_yearly": raw_data.generation.json_yearly,
             "json_month_hourly": raw_data.generation.json_month_hourly,
             "json_last_30_days_hourly": raw_data.generation.json_last_30_days_hourly,
-        }
+        },
+        "raw_data_reactive_inductive": {
+            "json_daily": raw_data.reactive_inductive.json_daily,
+            "daily_date": raw_data.reactive_inductive.daily_date,
+            "json_monthly": raw_data.reactive_inductive.json_monthly,
+            "json_yearly": raw_data.reactive_inductive.json_yearly,
+            "json_month_hourly": raw_data.reactive_inductive.json_month_hourly,
+            "json_last_30_days_hourly": raw_data.reactive_inductive.json_last_30_days_hourly,
+        },
+        "raw_data_reactive_capacitive": {
+            "json_daily": raw_data.reactive_capacitive.json_daily,
+            "daily_date": raw_data.reactive_capacitive.daily_date,
+            "json_monthly": raw_data.reactive_capacitive.json_monthly,
+            "json_yearly": raw_data.reactive_capacitive.json_yearly,
+            "json_month_hourly": raw_data.reactive_capacitive.json_month_hourly,
+            "json_last_30_days_hourly": raw_data.reactive_capacitive.json_last_30_days_hourly,
+        },
+        "raw_data_net_consumption": {
+            "json_daily": raw_data.net_consumption.json_daily,
+            "daily_date": raw_data.net_consumption.daily_date,
+            "json_monthly": raw_data.net_consumption.json_monthly,
+            "json_yearly": raw_data.net_consumption.json_yearly,
+            "json_month_hourly": raw_data.net_consumption.json_month_hourly,
+            "json_last_30_days_hourly": raw_data.net_consumption.json_last_30_days_hourly,
+        },
+        "raw_data_net_generation": {
+            "json_daily": raw_data.net_generation.json_daily,
+            "daily_date": raw_data.net_generation.daily_date,
+            "json_monthly": raw_data.net_generation.json_monthly,
+            "json_yearly": raw_data.net_generation.json_yearly,
+            "json_month_hourly": raw_data.net_generation.json_month_hourly,
+            "json_last_30_days_hourly": raw_data.net_generation.json_last_30_days_hourly,
+        },
     }

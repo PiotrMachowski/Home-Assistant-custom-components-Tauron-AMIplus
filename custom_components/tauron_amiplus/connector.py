@@ -14,8 +14,15 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
 
 from .const import (
+    API_TYPE_BY_DATA_KIND,
+    CONST_CONSUMPTION,
     CONST_DATE_FORMAT,
+    CONST_GENERATION,
     CONST_MAX_LOOKUP_RANGE,
+    CONST_NET_CONSUMPTION,
+    CONST_NET_GENERATION,
+    CONST_REACTIVE_CAPACITIVE,
+    CONST_REACTIVE_INDUCTIVE,
     CONST_REQUEST_HEADERS,
     CONST_URL_ENERGY,
     CONST_URL_ENERGY_BUSINESS,
@@ -25,6 +32,7 @@ from .const import (
     CONST_URL_SELECT_METER,
     CONST_URL_SERVICE,
     CONST_URL_SERVICE_MOJ_TAURON,
+    ENERGY_PARAM_BY_DATA_KIND,
     STORAGE_VERSION,
     STORAGE_KEY_PREFIX,
 )
@@ -37,6 +45,10 @@ class TauronAmiplusRawData:
         self.tariff = None
         self.consumption: Optional[TauronAmiplusDataSet] = None
         self.generation: Optional[TauronAmiplusDataSet] = None
+        self.reactive_inductive: Optional[TauronAmiplusDataSet] = None
+        self.reactive_capacitive: Optional[TauronAmiplusDataSet] = None
+        self.net_consumption: Optional[TauronAmiplusDataSet] = None
+        self.net_generation: Optional[TauronAmiplusDataSet] = None
         self.payments: Optional[list[MojTauronPaymentData]] = None
 
     def data_unavailable(self):
@@ -114,6 +126,8 @@ class TauronAmiplusConnector:
         show_balanced_yearly: bool = False,
         show_configurable: bool = False,
         show_configurable_date: datetime.date = None,
+        show_reactive: bool = False,
+        show_net_billing: bool = False,
     ):
         self._username = username
         self._password = password
@@ -126,6 +140,8 @@ class TauronAmiplusConnector:
         self._show_balanced_yearly = show_balanced_yearly
         self._show_configurable = show_configurable
         self._show_configurable_date = show_configurable_date
+        self._show_reactive = show_reactive
+        self._show_net_billing = show_net_billing
         self._session: ClientSession | None = None
         self._cache = DailyDataCache(meter_id)
         self._hass = hass
@@ -135,37 +151,54 @@ class TauronAmiplusConnector:
         data = TauronAmiplusRawData()
         # data.payments = await self.get_moj_tauron()
         data.tariff = await self.login()
-        generation_max_cache = datetime.datetime.now()
-        data.consumption, consumption_max_cache = await self.get_data_set(generation=False)
+        cache_maxes = []
+        data.consumption, consumption_max_cache = await self.get_data_set(CONST_CONSUMPTION)
+        cache_maxes.append(consumption_max_cache)
         if self._show_generation or self._show_balanced:
-            data.generation, generation_max_cache = await self.get_data_set(generation=True)
+            data.generation, generation_max_cache = await self.get_data_set(CONST_GENERATION)
+            cache_maxes.append(generation_max_cache)
         else:
             data.generation = TauronAmiplusDataSet()
-        self._cache.delete_older_than(min(consumption_max_cache, generation_max_cache))
+        if self._show_reactive:
+            data.reactive_inductive, reactive_inductive_max_cache = await self.get_data_set(CONST_REACTIVE_INDUCTIVE)
+            data.reactive_capacitive, reactive_capacitive_max_cache = await self.get_data_set(CONST_REACTIVE_CAPACITIVE)
+            cache_maxes.extend([reactive_inductive_max_cache, reactive_capacitive_max_cache])
+        else:
+            data.reactive_inductive = TauronAmiplusDataSet()
+            data.reactive_capacitive = TauronAmiplusDataSet()
+        if self._show_net_billing:
+            data.net_consumption, net_consumption_max_cache = await self.get_data_set(CONST_NET_CONSUMPTION)
+            data.net_generation, net_generation_max_cache = await self.get_data_set(CONST_NET_GENERATION)
+            cache_maxes.extend([net_consumption_max_cache, net_generation_max_cache])
+        else:
+            data.net_consumption = TauronAmiplusDataSet()
+            data.net_generation = TauronAmiplusDataSet()
+        self._cache.delete_older_than(min(cache_maxes))
         return data
 
-    async def get_data_set(self, generation) -> Tuple[TauronAmiplusDataSet, datetime.datetime]:
+    async def get_data_set(self, data_type: str) -> Tuple[TauronAmiplusDataSet, datetime.datetime]:
         dataset = TauronAmiplusDataSet()
-        dataset.json_reading = await self.get_reading(generation)
-        dataset.json_daily, dataset.daily_date = await self.get_values_daily(generation)
-        dataset.json_monthly = await self.get_values_monthly(generation)
-        dataset.json_yearly = await self.get_values_yearly(generation)
-        dataset.json_month_hourly = await self.get_values_month_hourly(generation)
-        dataset.json_last_30_days_hourly = await self.get_values_last_30_days_hourly(generation)
+        if data_type in (CONST_CONSUMPTION, CONST_GENERATION):
+            dataset.json_reading = await self.get_reading(data_type == CONST_GENERATION)
+        dataset.json_daily, dataset.daily_date = await self.get_values_daily(data_type)
+        dataset.json_monthly = await self.get_values_monthly(data_type)
+        dataset.json_yearly = await self.get_values_yearly(data_type)
+        dataset.json_month_hourly = await self.get_values_month_hourly(data_type)
+        dataset.json_last_30_days_hourly = await self.get_values_last_30_days_hourly(data_type)
         now = datetime.datetime.now()
         cache_max = datetime.datetime.now() - datetime.timedelta(days=32)
         if self._show_12_months:
-            dataset.json_last_12_months_hourly = await self.get_values_12_months_hourly(generation)
+            dataset.json_last_12_months_hourly = await self.get_values_12_months_hourly(data_type)
             cache_max = now.replace(year=now.year - 1) - datetime.timedelta(days=2)
         if self._show_balanced_yearly:
-            dataset.json_year_hourly = await self.get_values_year_hourly(generation)
+            dataset.json_year_hourly = await self.get_values_year_hourly(data_type)
             potential_max = now.replace(day=1, month=1)
             if potential_max < cache_max:
                 cache_max = potential_max
         if self._show_configurable and self._show_configurable_date is not None:
             end = datetime.datetime.now()
             start = datetime.datetime.combine(self._show_configurable_date, end.time())
-            dataset.json_configurable_hourly = await self.get_raw_values_daily_for_range(start, end, generation)
+            dataset.json_configurable_hourly = await self.get_raw_values_daily_for_range(start, end, data_type)
             potential_max = end - datetime.timedelta(days=2)
             if potential_max < cache_max:
                 cache_max = potential_max
@@ -310,7 +343,7 @@ class TauronAmiplusConnector:
             meters.append({"meter_id": meter_id, "meter_name": display_name, "meter_type": meter_type})
         return meters
 
-    async def get_values_yearly(self, generation):
+    async def get_values_yearly(self, data_type: str):
         now = datetime.datetime.now()
         first_day_of_year = now.replace(day=1, month=1)
         last_day_of_year = now.replace(day=31, month=12)
@@ -318,18 +351,17 @@ class TauronAmiplusConnector:
             "from": TauronAmiplusConnector.format_date(first_day_of_year),
             "to": TauronAmiplusConnector.format_date(last_day_of_year),
             "profile": "year",
-            "type": "oze" if generation else "consum",
-            "energy": 2 if generation else 1,
+            **TauronAmiplusConnector.get_type_payload(data_type),
         }
-        self.log(f"Downloading yearly data for year: {now.year}, generation: {generation}")
+        self.log(f"Downloading yearly data for year: {now.year}, data_type: {data_type}")
         values = await self.get_chart_values(payload)
         if values is not None:
-            self.log(f"Downloaded yearly data for year: {now.year}, generation: {generation}")
+            self.log(f"Downloaded yearly data for year: {now.year}, data_type: {data_type}")
         else:
-            self.log(f"Failed to download yearly data for year: {now.year}, generation: {generation}")
+            self.log(f"Failed to download yearly data for year: {now.year}, data_type: {data_type}")
         return values
 
-    async def get_values_monthly(self, generation):
+    async def get_values_monthly(self, data_type: str):
         now = datetime.datetime.now()
         month = now.month
         first_day_of_month = now.replace(day=1)
@@ -339,50 +371,49 @@ class TauronAmiplusConnector:
             "from": TauronAmiplusConnector.format_date(first_day_of_month),
             "to": TauronAmiplusConnector.format_date(last_day_of_month),
             "profile": "month",
-            "type": "oze" if generation else "consum",
-            "energy": 2 if generation else 1,
+            **TauronAmiplusConnector.get_type_payload(data_type),
         }
         values = await self.get_chart_values(payload)
         if values is not None:
-            self.log(f"Downloaded monthly data for month: {now.year}.{now.month}, generation: {generation}")
+            self.log(f"Downloaded monthly data for month: {now.year}.{now.month}, data_type: {data_type}")
         else:
-            self.log(f"Failed to download monthly data for month: {now.year}.{now.month}, generation: {generation}")
+            self.log(f"Failed to download monthly data for month: {now.year}.{now.month}, data_type: {data_type}")
         return values
 
-    async def get_values_daily(self, generation):
+    async def get_values_daily(self, data_type: str):
         offset = 1
         data = None
         day = None
         while offset <= CONST_MAX_LOOKUP_RANGE and data is None:
-            data, day = await self.get_raw_values_daily(offset, generation)
+            data, day = await self.get_raw_values_daily(offset, data_type)
             offset += 1
         return data, day
 
-    async def get_raw_values_daily(self, days_before, generation):
+    async def get_raw_values_daily(self, days_before, data_type: str):
         day = datetime.datetime.now() - datetime.timedelta(days_before)
-        return await self.get_raw_values_daily_for_day(day, generation), TauronAmiplusConnector.format_date(day)
+        return await self.get_raw_values_daily_for_day(day, data_type), TauronAmiplusConnector.format_date(day)
 
-    async def get_values_month_hourly(self, generation):
+    async def get_values_month_hourly(self, data_type: str):
         now = datetime.datetime.now()
         start_day = now.replace(day=1)
-        return await self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, data_type)
 
-    async def get_values_year_hourly(self, generation):
+    async def get_values_year_hourly(self, data_type: str):
         now = datetime.datetime.now()
         start_day = now.replace(day=1, month=1)
-        return await self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, data_type)
 
-    async def get_values_last_30_days_hourly(self, generation):
+    async def get_values_last_30_days_hourly(self, data_type: str):
         now = datetime.datetime.now()
         start_day = now - datetime.timedelta(days=30)
-        return await self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, data_type)
 
-    async def get_values_12_months_hourly(self, generation):
+    async def get_values_12_months_hourly(self, data_type: str):
         now = datetime.datetime.now()
         start_day = now.replace(year=now.year - 1)
-        return await self.get_raw_values_daily_for_range(start_day, now, generation)
+        return await self.get_raw_values_daily_for_range(start_day, now, data_type)
 
-    async def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, generation):
+    async def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, data_type: str):
         data = {"data": {
             "allData": [],
             "sum": 0,
@@ -390,7 +421,7 @@ class TauronAmiplusConnector:
             "zonesName": {}
         }}
         for day in [day_from + datetime.timedelta(days=x) for x in range((day_to - day_from).days + 1)]:
-            day_data = await self.get_raw_values_daily_for_day(day, generation)
+            day_data = await self.get_raw_values_daily_for_day(day, data_type)
             if day_data is not None:
                 data["data"]["allData"].extend(day_data["data"]["allData"])
                 data["data"]["sum"] += day_data["data"]["sum"]
@@ -407,21 +438,20 @@ class TauronAmiplusConnector:
             return None
         return data
 
-    async def get_raw_values_daily_for_day(self, day, generation: bool):
+    async def get_raw_values_daily_for_day(self, day, data_type: str):
         day_str = TauronAmiplusConnector.format_date(day)
-        cached_data = self._cache.get_value(day, generation)
+        cached_data = self._cache.get_value(day, data_type)
         if cached_data is not None:
-            self.log(f"Cache hit for day {day_str}, generation: {generation}")
+            self.log(f"Cache hit for day {day_str}, data_type: {data_type}")
             return cached_data
 
         payload = {
             "from": day_str,
             "to": day_str,
             "profile": "full time",
-            "type": "oze" if generation else "consum",
-            "energy": 2 if generation else 1,
+            **TauronAmiplusConnector.get_type_payload(data_type),
         }
-        self.log(f"Downloading daily data for day: {day_str}, generation: {generation}")
+        self.log(f"Downloading daily data for day: {day_str}, data_type: {data_type}")
         values = await self.get_chart_values(payload)
         if values is not None:
             if values["data"].get("allData") is None or any(
@@ -433,13 +463,13 @@ class TauronAmiplusConnector:
                 for i, v in enumerate(values["data"]["allData"]):
                     v["Date"] = day.strftime("%Y-%m-%d")
             if all(self.contains_data(a) for a in values["data"]["allData"]):
-                self._cache.add_value(day, generation, values)
+                self._cache.add_value(day, data_type, values)
             values["data"]["allData"] = [
                 d for d in values["data"]["allData"] if self.contains_data(d)
             ]
-            self.log(f"Downloaded daily data for day: {day_str}, generation: {generation}")
+            self.log(f"Downloaded daily data for day: {day_str}, data_type: {data_type}")
             return values
-        self.log(f"Failed to download daily data for day: {day_str}, generation: {generation}")
+        self.log(f"Failed to download daily data for day: {day_str}, data_type: {data_type}")
         return None
 
     async def get_reading(self, generation):
@@ -462,6 +492,13 @@ class TauronAmiplusConnector:
 
     async def get_chart_values(self, payload):
         return await self.execute_post(CONST_URL_ENERGY_BUSINESS if self._is_business else CONST_URL_ENERGY, payload)
+
+    @staticmethod
+    def get_type_payload(data_type: str) -> dict:
+        payload = {"type": API_TYPE_BY_DATA_KIND[data_type]}
+        if data_type in ENERGY_PARAM_BY_DATA_KIND:
+            payload["energy"] = ENERGY_PARAM_BY_DATA_KIND[data_type]
+        return payload
 
     async def execute_post(self, url: str, payload: dict):
         self.log(f"EXECUTING: {url} with payload: {payload}")
@@ -555,34 +592,26 @@ class TauronAmiplusConnector:
 class DailyDataCache:
 
     def __init__(self, meter_id):
-        self._consumption_data = dict()
-        self._generation_data = dict()
+        self._data: dict[str, dict[str, Any]] = {}
         self._max_date = datetime.datetime.now() + datetime.timedelta(days=1)
         self._meter_id = meter_id
 
-    def __contains__(self, item: Tuple[str, bool]):
-        date_str, generation = item
-        if generation:
-            return date_str in self._generation_data
-        return date_str in self._consumption_data
+    def __contains__(self, item: Tuple[str, str]):
+        date_str, data_type = item
+        return date_str in self._data.get(data_type, {})
 
-    def add_value(self, date: datetime.datetime, generation: bool, value):
+    def add_value(self, date: datetime.datetime, data_type: str, value):
         date_str = self._format_date(date)
         if value is None:
             return
-        if generation:
-            self._generation_data[date_str] = value
-        else:
-            self._consumption_data[date_str] = value
+        self._data.setdefault(data_type, {})[date_str] = value
         if self._max_date is None or self._max_date > date:
             self._max_date = date
 
-    def get_value(self, date: datetime.datetime, generation: bool):
+    def get_value(self, date: datetime.datetime, data_type: str):
         date_str = self._format_date(date)
-        if (date_str, generation) in self:
-            if generation:
-                return self._generation_data[date_str]
-            return self._consumption_data[date_str]
+        if (date_str, data_type) in self:
+            return self._data[data_type][date_str]
         return None
 
     def delete_older_than(self, date: datetime.datetime):
@@ -594,17 +623,14 @@ class DailyDataCache:
     def delete_day(self, date: datetime.datetime):
         date_str = self._format_date(date)
         self.log(f"Deleting data from cache for day: {date_str}")
-        if date_str in self._generation_data:
-            self._generation_data.pop(date_str)
-        if date_str in self._consumption_data:
-            self._consumption_data.pop(date_str)
+        for data_type_cache in self._data.values():
+            data_type_cache.pop(date_str, None)
 
     def clear(self) -> None:
         self.log(
-            f"Clearing cache: consumption - {len(self._consumption_data)}, generation - {len(self._generation_data)}"
+            f"Clearing cache: {', '.join(f'{k} - {len(v)}' for k, v in self._data.items()) or 'empty'}"
         )
-        self._generation_data.clear()
-        self._consumption_data.clear()
+        self._data.clear()
 
     @staticmethod
     def _format_date(date):

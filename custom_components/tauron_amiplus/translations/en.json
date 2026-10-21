@@ -30,6 +30,8 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
+          "show_reactive_sensors": "Enable downloading reactive power data (inductive/capacitive)",
+          "show_net_billing_sensors": "Enable downloading net-billed energy data (calculated by TAURON)",
           "store_statistics": "Store hourly statistics (for Energy dashboard)"
         }
       },
@@ -56,6 +58,8 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
+          "show_reactive_sensors": "Enable downloading reactive power data (inductive/capacitive)",
+          "show_net_billing_sensors": "Enable downloading net-billed energy data (calculated by TAURON)",
           "store_statistics": "Store hourly statistics (for Energy dashboard)"
         }
       }

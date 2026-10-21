@@ -30,6 +30,8 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
+          "show_reactive_sensors": "Pobieranie danych o mocy biernej (indukcyjnej/pojemnościowej)",
+          "show_net_billing_sensors": "Pobieranie danych o energii po zbilansowaniu (netto) wyliczonych przez TAURON",
           "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
       },
@@ -55,6 +57,8 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
+          "show_reactive_sensors": "Pobieranie danych o mocy biernej (indukcyjnej/pojemnościowej)",
+          "show_net_billing_sensors": "Pobieranie danych o energii po zbilansowaniu (netto) wyliczonych przez TAURON",
           "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
       }

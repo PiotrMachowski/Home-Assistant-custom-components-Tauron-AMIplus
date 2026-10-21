@@ -12,8 +12,8 @@ from homeassistant.util.dt import DATE_STR_FORMAT, parse_date
 
 from .const import (
     CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
-    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_STORE_STATISTICS, CONF_TARIFF,
-    DOMAIN, PLATFORMS,
+    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_SHOW_NET_BILLING,
+    CONF_SHOW_REACTIVE, CONF_STORE_STATISTICS, CONF_TARIFF, DOMAIN, PLATFORMS,
 )
 from .coordinator import TauronAmiplusUpdateCoordinator
 from .services import register_all_services
@@ -64,6 +64,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConf
     show_balanced_year = config_entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
     show_configurable = config_entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = config_entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+    show_reactive = config_entry.options.get(CONF_SHOW_REACTIVE, False)
+    show_net_billing = config_entry.options.get(CONF_SHOW_NET_BILLING, False)
     store_statistics = config_entry.options.get(CONF_STORE_STATISTICS, False)
     if show_configurable_date is not None:
         show_configurable_date = parse_date(show_configurable_date)
@@ -83,6 +85,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConf
         show_balanced_year=show_balanced_year,
         show_configurable=show_configurable,
         show_configurable_date=show_configurable_date,
+        show_reactive=show_reactive,
+        show_net_billing=show_net_billing,
         store_statistics=store_statistics,
     )
     config_entry.runtime_data = TauronAmiplusRuntimeData(tauron_amiplus_update_coordinator)
