@@ -252,7 +252,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         for consumption, generation in zip(consumption_data, generation_data):
             value_consumption = float(consumption["EC"])
             value_generation = float(generation["EC"])
-            zone = zone_names[consumption["Zone"]]
+            zone = zone_names.get(consumption["Zone"], f"zone_{consumption['Zone']}")
             balance = value_consumption - value_generation
             if balance > 0:
                 sum_consumption += balance
@@ -296,7 +296,6 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "manufacturer": "TAURON",
             "model": self._meter_id,
             "sw_version": f"Tariff {self._tariff}",
-            "via_device": None,
             "configuration_url": CONST_URL_SERVICE,
         }
 
