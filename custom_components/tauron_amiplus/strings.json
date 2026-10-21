@@ -30,6 +30,7 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
+          "prosument_ratio": "Prosument ratio applied to generation in balance sensors' \"balance_bank\" attribute (0.8 for net-metering <=10 kWp, 0.7 for larger installations, 1.0 for net-billing / no deposit)",
           "store_statistics": "Store hourly statistics (for Energy dashboard)"
         }
       },
@@ -56,6 +57,7 @@
           "show_12_months_sensors": "Enable calculating energy usage/generation for 12 months period",
           "show_configurable_sensors": "Enable calculating energy usage/generation for a configurable data period",
           "show_configurable_sensors_date": "Start date for configurable data period",
+          "prosument_ratio": "Prosument ratio applied to generation in balance sensors' \"balance_bank\" attribute (0.8 for net-metering <=10 kWp, 0.7 for larger installations, 1.0 for net-billing / no deposit)",
           "store_statistics": "Store hourly statistics (for Energy dashboard)"
         }
       }

@@ -18,7 +18,12 @@ CONF_SHOW_BALANCED_YEAR = "show_balanced_year_sensors"
 CONF_SHOW_12_MONTHS = "show_12_months_sensors"
 CONF_SHOW_CONFIGURABLE = "show_configurable_sensors"
 CONF_SHOW_CONFIGURABLE_DATE = "show_configurable_sensors_date"
+CONF_PROSUMENT_RATIO = "prosument_ratio"
 CONF_STORE_STATISTICS = "store_statistics"
+# Wspolczynnik prosumenta stosowany do energii oddanej przy przeliczaniu
+# "banku" energii w systemie opustow (net-metering): 0.8 dla mikroinstalacji
+# <=10 kWp, 0.7 dla wiekszych, 1.0 (bez przeliczenia) dla net-billingu.
+DEFAULT_PROSUMENT_RATIO = 1.0
 CONST_DATE_FORMAT = "%d.%m.%Y"
 CONST_MAX_LOOKUP_RANGE = 7
 CONST_URL_LOGIN = "https://logowanie.tauron-dystrybucja.pl/login"

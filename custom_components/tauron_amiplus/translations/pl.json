@@ -30,6 +30,7 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
+          "prosument_ratio": "Współczynnik prosumenta stosowany do energii oddanej w atrybucie \"balance_bank\" sensorów bilansu (0.8 dla net-meteringu do 10 kWp, 0.7 dla większych instalacji, 1.0 dla net-billingu / brak depozytu)",
           "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
       },
@@ -55,6 +56,7 @@
           "show_12_months_sensors": "Obliczanie podsumowań dla okresu 12 miesięcy",
           "show_configurable_sensors": "Obliczanie podsumowań dla okresu o konfigurowalnym początku",
           "show_configurable_sensors_date": "Początek okresu dla konfigurowalnych podsumowań",
+          "prosument_ratio": "Współczynnik prosumenta stosowany do energii oddanej w atrybucie \"balance_bank\" sensorów bilansu (0.8 dla net-meteringu do 10 kWp, 0.7 dla większych instalacji, 1.0 dla net-billingu / brak depozytu)",
           "store_statistics": "Zapisywanie godzinowe statystyki (dla panelu Energia)"
         }
       }

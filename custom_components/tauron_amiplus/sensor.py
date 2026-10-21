@@ -9,13 +9,13 @@ from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWO
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .connector import TauronAmiplusRawData
-from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED, CONF_SHOW_BALANCED_YEAR,
-                    CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION, CONF_TARIFF,
-                    CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
-                    CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY, DEFAULT_NAME,
-                    DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML, TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY,
-                    TYPE_BALANCED_LAST_12_MONTHS, TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY,
-                    TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT)
+from .const import (CONF_METER_ID, CONF_METER_NAME, CONF_PROSUMENT_RATIO, CONF_SHOW_12_MONTHS, CONF_SHOW_BALANCED,
+                    CONF_SHOW_BALANCED_YEAR, CONF_SHOW_CONFIGURABLE, CONF_SHOW_CONFIGURABLE_DATE, CONF_SHOW_GENERATION,
+                    CONF_TARIFF, CONST_BALANCED, CONST_CONFIGURABLE, CONST_DAILY, CONST_GENERATION,
+                    CONST_LAST_12_MONTHS, CONST_MONTHLY, CONST_READING, CONST_URL_SERVICE, CONST_YEARLY,
+                    DEFAULT_NAME, DEFAULT_PROSUMENT_RATIO, DOMAIN, SENSOR_TYPES, SENSOR_TYPES_YAML,
+                    TYPE_BALANCED_CONFIGURABLE, TYPE_BALANCED_DAILY, TYPE_BALANCED_LAST_12_MONTHS,
+                    TYPE_BALANCED_MONTHLY, TYPE_BALANCED_YEARLY, TYPE_AMOUNT, TYPE_AMOUNT_PAYMENT)
 from .coordinator import TauronAmiplusUpdateCoordinator
 from .typing_helpers import TauronAmiplusConfigEntry
 
@@ -68,6 +68,7 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
     show_balanced_year = entry.options.get(CONF_SHOW_BALANCED_YEAR, False)
     show_configurable = entry.options.get(CONF_SHOW_CONFIGURABLE, False)
     show_configurable_date = entry.options.get(CONF_SHOW_CONFIGURABLE_DATE, None)
+    prosument_ratio = entry.options.get(CONF_PROSUMENT_RATIO, DEFAULT_PROSUMENT_RATIO)
     if show_configurable_date is None:
         show_configurable = False
 
@@ -95,7 +96,8 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
                 sensor_type,
                 sensor_type_config["state_class"],
                 tariff,
-                meter_name
+                meter_name,
+                prosument_ratio,
             )
         )
 
@@ -105,13 +107,14 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
 class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 
     def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
-                 state_class: SensorStateClass):
+                 state_class: SensorStateClass, prosument_ratio: float = DEFAULT_PROSUMENT_RATIO):
         super().__init__(coordinator)
         self._client_name = name
         self._meter_id = meter_id
         self._generation = sensor_type.startswith(CONST_GENERATION)
         self._sensor_type = sensor_type
         self._state_class = state_class
+        self._prosument_ratio = prosument_ratio
         self._power_zones = None
         self._tariff = None
         self._params = {}
@@ -206,12 +209,16 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
     def update_balanced_data(self, balanced_data):
         con = balanced_data[0]
         gen = balanced_data[1]
-        balance, sum_consumption, sum_generation, zones, data_range = TauronAmiplusSensor.get_balanced_data(con, gen)
+        balance, balance_bank, sum_consumption, sum_generation, zones, data_range = (
+            TauronAmiplusSensor.get_balanced_data(con, gen, self._prosument_ratio)
+        )
         self._state = round(balance, 3)
         self._params = {
             "sum_consumption": round(sum_consumption, 3),
             "sum_generation": round(sum_generation, 3),
             "data_range": data_range,
+            "prosument_ratio": self._prosument_ratio,
+            "balance_bank": round(balance_bank, 3),
             **{k: round(v, 3) for (k, v) in zones.items()},
         }
 
@@ -237,12 +244,13 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         return total, zones, data_range
 
     @staticmethod
-    def get_balanced_data(consumption_data_json, generation_data_json):
+    def get_balanced_data(consumption_data_json, generation_data_json,
+                         prosument_ratio: float = DEFAULT_PROSUMENT_RATIO):
         zone_names = consumption_data_json["data"]["zonesName"]
         consumption_data = consumption_data_json["data"]["allData"]
         generation_data = generation_data_json["data"]["allData"]
         if len(consumption_data) == 0 or len(generation_data) == 0:
-            return 0, 0, 0, {}, ""
+            return 0, 0, 0, 0, {}, ""
         data_range = f"{consumption_data[0]['Date']} - {consumption_data[-1]['Date']}"
 
         sum_consumption = 0
@@ -268,7 +276,8 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
                 zones[zone_key] += balance
 
         balance = sum_consumption + sum_generation
-        return balance, sum_consumption, sum_generation, zones, data_range
+        balance_bank = sum_consumption + sum_generation * prosument_ratio
+        return balance, balance_bank, sum_consumption, sum_generation, zones, data_range
 
     @property
     def unique_id(self):
@@ -282,9 +291,10 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
 class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
 
     def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
-                 state_class: SensorStateClass, tariff: str, meter_name: str):
+                 state_class: SensorStateClass, tariff: str, meter_name: str,
+                 prosument_ratio: float = DEFAULT_PROSUMENT_RATIO):
         """Initialize the sensor."""
-        super().__init__(coordinator, name, meter_id, sensor_type, state_class)
+        super().__init__(coordinator, name, meter_id, sensor_type, state_class, prosument_ratio)
         self._tariff = tariff
         self._meter_name = meter_name
 
