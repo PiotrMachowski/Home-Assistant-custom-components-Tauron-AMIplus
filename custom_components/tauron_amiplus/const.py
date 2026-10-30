@@ -1,5 +1,4 @@
 """Constants for tauron."""
-from datetime import timedelta
 
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import Platform
@@ -61,7 +60,9 @@ TYPE_GENERATION_CONFIGURABLE = f"{CONST_GENERATION}_{CONST_CONFIGURABLE}"
 TYPE_AMOUNT = "moj_tauron"
 TYPE_AMOUNT_PAYMENT = f"{TYPE_AMOUNT}_PAYMENT"
 
-DEFAULT_UPDATE_INTERVAL = timedelta(hours=8, minutes=30)
+SMART_POLLING_WINDOW_MORNING = (6, 30)
+SMART_POLLING_WINDOW_AFTERNOON = (14, 30)
+SMART_POLLING_WINDOW_RETRY = (22, 30)
 SENSOR_TYPES_YAML = {
     TYPE_CONSUMPTION_READING: {
         "name": "Current consumption reading",

@@ -1,17 +1,21 @@
-"""Update coordinator for TAURON sensors."""
+import asyncio
+import copy
 import datetime
+import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Optional, Tuple, Any
 
-from aiohttp import ClientSession
+from aiohttp import ClientError, ClientOSError, ClientSession, ServerDisconnectedError
 # from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
+from homeassistant.util.dt import as_utc, get_time_zone
 
 from .const import (
     CONST_DATE_FORMAT,
@@ -127,11 +131,19 @@ class TauronAmiplusConnector:
         self._show_configurable = show_configurable
         self._show_configurable_date = show_configurable_date
         self._session: ClientSession | None = None
-        self._cache = DailyDataCache(meter_id)
         self._hass = hass
         self._storage_key = f"{STORAGE_KEY_PREFIX}_{config_entry_id}" if config_entry_id is not None else None
+        self._cache = DailyDataCache(meter_id, hass, self._storage_key)
+        self._cycle_cache: dict[tuple[str, bool], dict | None] = {}
+        self._cycle_cache_hits = 0
+        self._cycle_downloads = 0
 
     async def get_raw_data(self) -> TauronAmiplusRawData:
+        start_fetch = time.monotonic()
+        self._cycle_cache_hits = 0
+        self._cycle_downloads = 0
+        self._cycle_cache.clear()
+        await self._cache.async_load()
         data = TauronAmiplusRawData()
         # data.payments = await self.get_moj_tauron()
         data.tariff = await self.login()
@@ -142,6 +154,12 @@ class TauronAmiplusConnector:
         else:
             data.generation = TauronAmiplusDataSet()
         self._cache.delete_older_than(min(consumption_max_cache, generation_max_cache))
+        await self._cache.async_save()
+        elapsed = time.monotonic() - start_fetch
+        _LOGGER.info(
+            f"[{self._meter_id}] Data fetch completed in {elapsed:.1f}s: "
+            f"{self._cycle_cache_hits} days loaded from cache, {self._cycle_downloads} new days downloaded from Tauron API"
+        )
         return data
 
     async def get_data_set(self, generation) -> Tuple[TauronAmiplusDataSet, datetime.datetime]:
@@ -150,10 +168,10 @@ class TauronAmiplusConnector:
         dataset.json_daily, dataset.daily_date = await self.get_values_daily(generation)
         dataset.json_monthly = await self.get_values_monthly(generation)
         dataset.json_yearly = await self.get_values_yearly(generation)
-        dataset.json_month_hourly = await self.get_values_month_hourly(generation)
-        dataset.json_last_30_days_hourly = await self.get_values_last_30_days_hourly(generation)
+        if self._show_balanced:
+            dataset.json_month_hourly = await self.get_values_month_hourly(generation)
         now = datetime.datetime.now()
-        cache_max = datetime.datetime.now() - datetime.timedelta(days=32)
+        cache_max = datetime.datetime.now() - datetime.timedelta(days=366)
         if self._show_12_months:
             dataset.json_last_12_months_hourly = await self.get_values_12_months_hourly(generation)
             cache_max = now.replace(year=now.year - 1) - datetime.timedelta(days=2)
@@ -174,8 +192,10 @@ class TauronAmiplusConnector:
     async def login_service(self, login_url: str, service: str) -> tuple[ClientSession, str]:
         success, response, session = await self.try_restore_session(service)
         if success:
+            _LOGGER.info(f"[{self._meter_id}] Reusing cached session cookies (valid)")
             return session, response
 
+        _LOGGER.info(f"[{self._meter_id}] Session expired or not found. Authenticating via Keycloak OIDC...")
         self.log(f"Logging in... ({service})")
 
         # Step 1: GET login page to retrieve the Keycloak form action URL.
@@ -225,6 +245,7 @@ class TauronAmiplusConnector:
             raise Exception("Failed to login")
 
         await self.store_session(session, service)
+        _LOGGER.info(f"[{self._meter_id}] Authenticated successfully via Keycloak OIDC")
         return session, login_response_text
 
     async def try_restore_session(self, service: str) -> (bool, str | None, ClientSession):
@@ -266,9 +287,13 @@ class TauronAmiplusConnector:
         await store.async_save({"cookies": cookies})
 
     async def validate_session(self, session: ClientSession, service: str) -> (bool, str):
-        response = await session.get(service)
-        response_text = await response.text()
-        return self._username in response_text or self._username.upper() in response_text.upper(), response_text
+        try:
+            response = await session.get(service)
+            response_text = await response.text()
+            return self._username in response_text or self._username.upper() in response_text.upper(), response_text
+        except (ClientOSError, ServerDisconnectedError, ClientError) as err:
+            self.log(f"Session validation error ({err})")
+            return False, ""
 
     async def login(self):
         session, login_response_text = await self.login_service(CONST_URL_LOGIN, CONST_URL_SERVICE)
@@ -282,7 +307,19 @@ class TauronAmiplusConnector:
         else:
             self._is_business = False
         self.log(f"Selecting meter: {self._meter_id}")
-        select_response = await self._session.request("POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS)
+        select_response = None
+        for attempt in range(2):
+            try:
+                select_response = await self._session.request(
+                    "POST", CONST_URL_SELECT_METER, data=payload_select_meter, headers=CONST_REQUEST_HEADERS
+                )
+                break
+            except (ClientOSError, ServerDisconnectedError) as err:
+                if attempt == 0:
+                    self.log(f"Transient connection error ({err}) on select meter, retrying once...")
+                    await asyncio.sleep(1)
+                    continue
+                raise
         select_response_text = await select_response.text()
         tariff_search = re.findall(r"[^_]Tariff: '(.*)',", select_response_text)
         if len(tariff_search) > 0:
@@ -292,6 +329,21 @@ class TauronAmiplusConnector:
 
     def clear_cache(self) -> None:
         self._cache.clear()
+        self._cycle_cache.clear()
+
+    async def async_save_cache(self) -> None:
+        await self._cache.async_save()
+
+    async def async_clear_cache(self) -> None:
+        self.clear_cache()
+        await self._cache.async_save()
+
+    def is_day_cached(self, day: datetime.date | datetime.datetime) -> bool:
+        has_consumption = self._cache.get_value(day, generation=False) is not None
+        if self._show_generation or self._show_balanced:
+            has_generation = self._cache.get_value(day, generation=True) is not None
+            return has_consumption and has_generation
+        return has_consumption
 
     @staticmethod
     def _get_meters(text: str) -> list:
@@ -359,30 +411,41 @@ class TauronAmiplusConnector:
         return data, day
 
     async def get_raw_values_daily(self, days_before, generation):
-        day = datetime.datetime.now() - datetime.timedelta(days_before)
+        warsaw_tz = get_time_zone("Europe/Warsaw")
+        day = (datetime.datetime.now(warsaw_tz) - datetime.timedelta(days_before)).date()
         return await self.get_raw_values_daily_for_day(day, generation), TauronAmiplusConnector.format_date(day)
 
     async def get_values_month_hourly(self, generation):
-        now = datetime.datetime.now()
+        warsaw_tz = get_time_zone("Europe/Warsaw")
+        now = datetime.datetime.now(warsaw_tz).date()
         start_day = now.replace(day=1)
         return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
     async def get_values_year_hourly(self, generation):
-        now = datetime.datetime.now()
+        warsaw_tz = get_time_zone("Europe/Warsaw")
+        now = datetime.datetime.now(warsaw_tz).date()
         start_day = now.replace(day=1, month=1)
         return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
     async def get_values_last_30_days_hourly(self, generation):
-        now = datetime.datetime.now()
+        warsaw_tz = get_time_zone("Europe/Warsaw")
+        now = datetime.datetime.now(warsaw_tz).date()
         start_day = now - datetime.timedelta(days=30)
         return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
     async def get_values_12_months_hourly(self, generation):
-        now = datetime.datetime.now()
+        warsaw_tz = get_time_zone("Europe/Warsaw")
+        now = datetime.datetime.now(warsaw_tz).date()
         start_day = now.replace(year=now.year - 1)
         return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
-    async def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, generation):
+    async def get_raw_values_daily_for_range(
+        self, day_from: datetime.date | datetime.datetime, day_to: datetime.date | datetime.datetime, generation: bool, only_complete_days: bool = False
+    ):
+        if isinstance(day_from, datetime.datetime):
+            day_from = day_from.date()
+        if isinstance(day_to, datetime.datetime):
+            day_to = day_to.date()
         data = {"data": {
             "allData": [],
             "sum": 0,
@@ -392,7 +455,14 @@ class TauronAmiplusConnector:
         for day in [day_from + datetime.timedelta(days=x) for x in range((day_to - day_from).days + 1)]:
             day_data = await self.get_raw_values_daily_for_day(day, generation)
             if day_data is not None:
-                data["data"]["allData"].extend(day_data["data"]["allData"])
+                day_all_data = day_data["data"].get("allData", [])
+                expected_hours = self.get_expected_hours_for_day(day)
+                if only_complete_days:
+                    if len(day_all_data) != expected_hours or not all(self.contains_data(a) for a in day_all_data):
+                        self.log(f"Skipping incomplete day {day} from range ({len(day_all_data)}/{expected_hours} hours)")
+                        continue
+
+                data["data"]["allData"].extend(day_all_data)
                 data["data"]["sum"] += day_data["data"]["sum"]
                 data["data"]["zonesName"] = {**(day_data["data"]["zonesName"]), **(data["data"]["zonesName"])}
                 if "tariff" in day_data["data"]:
@@ -407,13 +477,26 @@ class TauronAmiplusConnector:
             return None
         return data
 
-    async def get_raw_values_daily_for_day(self, day, generation: bool):
+    async def get_raw_values_daily_for_day(self, day: datetime.date | datetime.datetime, generation: bool):
+        if isinstance(day, datetime.datetime):
+            day = day.date()
         day_str = TauronAmiplusConnector.format_date(day)
+        expected_hours = self.get_expected_hours_for_day(day)
         cached_data = self._cache.get_value(day, generation)
         if cached_data is not None:
+            self.normalize_daily_data(cached_data, day)
+            self._cycle_cache_hits += 1
             self.log(f"Cache hit for day {day_str}, generation: {generation}")
             return cached_data
 
+        cache_key = (day_str, generation)
+        if cache_key in self._cycle_cache:
+            self._cycle_cache_hits += 1
+            self.log(f"Cycle cache hit for day {day_str}, generation: {generation}")
+            cycle_data = self._cycle_cache[cache_key]
+            return copy.deepcopy(cycle_data) if cycle_data is not None else None
+
+        self._cycle_downloads += 1
         payload = {
             "from": day_str,
             "to": day_str,
@@ -432,13 +515,25 @@ class TauronAmiplusConnector:
             else:
                 for i, v in enumerate(values["data"]["allData"]):
                     v["Date"] = day.strftime("%Y-%m-%d")
-            if all(self.contains_data(a) for a in values["data"]["allData"]):
+                self.normalize_daily_data(values, day)
+
+            warsaw_tz = get_time_zone("Europe/Warsaw")
+            today = datetime.datetime.now(warsaw_tz).date()
+            all_data = values["data"].get("allData", [])
+            if (
+                day < today
+                and len(all_data) == expected_hours
+                and all(self.contains_data(a) for a in all_data)
+            ):
                 self._cache.add_value(day, generation, values)
+
             values["data"]["allData"] = [
                 d for d in values["data"]["allData"] if self.contains_data(d)
             ]
+            self._cycle_cache[cache_key] = copy.deepcopy(values)
             self.log(f"Downloaded daily data for day: {day_str}, generation: {generation}")
             return values
+        self._cycle_cache[cache_key] = None
         self.log(f"Failed to download daily data for day: {day_str}, generation: {generation}")
         return None
 
@@ -456,6 +551,14 @@ class TauronAmiplusConnector:
         post = await self.execute_post(CONST_URL_READINGS, payload)
         if post is not None:
             self.log(f"Downloaded readings for date: {date_to_str}, generation: {generation}")
+            if "data" in post and len(post["data"]) > 0:
+                reading = post["data"][-1]
+                c_val = reading.get("C")
+                r_date = reading.get("Date")
+                _LOGGER.info(
+                    f"[{self._meter_id}] Latest meter reading ({'generation' if generation else 'consumption'}): "
+                    f"{c_val} kWh (recorded at {r_date})"
+                )
         else:
             self.log(f"Failed to download readings for date: {date_to_str}, generation: {generation}")
         return post
@@ -465,12 +568,22 @@ class TauronAmiplusConnector:
 
     async def execute_post(self, url: str, payload: dict):
         self.log(f"EXECUTING: {url} with payload: {payload}")
-        response = await self._session.request(
-            "POST",
-            url,
-            data=payload,
-            headers=CONST_REQUEST_HEADERS,
-        )
+        response = None
+        for attempt in range(2):
+            try:
+                response = await self._session.request(
+                    "POST",
+                    url,
+                    data=payload,
+                    headers=CONST_REQUEST_HEADERS,
+                )
+                break
+            except (ClientOSError, ServerDisconnectedError) as err:
+                if attempt == 0:
+                    self.log(f"Transient connection error ({err}) on POST {url}, retrying once...")
+                    await asyncio.sleep(1)
+                    continue
+                raise
         response_text = await response.text()
         self.log(f"RESPONSE: {response_text}")
         if "Przekroczono maksymalną liczbę logowań." in response_text:
@@ -529,14 +642,103 @@ class TauronAmiplusConnector:
         raise Exception("Failed to calculate configuration")
 
     @staticmethod
-    def add_all_data(data: dict, date):
+    def get_expected_hours_for_day(date: datetime.date | datetime.datetime) -> int:
+        if isinstance(date, datetime.datetime):
+            date = date.date()
+        zone = get_time_zone("Europe/Warsaw")
+        start = datetime.datetime.combine(date, datetime.time(0, 0), tzinfo=zone)
+        end = datetime.datetime.combine(date + datetime.timedelta(days=1), datetime.time(0, 0), tzinfo=zone)
+        return int((as_utc(end) - as_utc(start)).total_seconds() // 3600)
+
+    @staticmethod
+    def normalize_daily_data(data: dict, date: datetime.date | datetime.datetime) -> None:
+        """Ensure allData has the expected number of hours for date (e.g. 25 for autumn DST, 23 for spring DST)."""
+        if "data" not in data or "allData" not in data["data"]:
+            return
+        if isinstance(date, datetime.datetime):
+            date = date.date()
+        all_data = data["data"]["allData"]
+        expected_hours = TauronAmiplusConnector.get_expected_hours_for_day(date)
+
+        # Autumn DST: 25 hours expected, 24 provided (index 2 contains combined 3:00 hours)
+        if expected_hours == 25 and len(all_data) == 24:
+            h3 = all_data[2]
+            try:
+                combined_ec = float(h3["EC"])
+                ec1 = round(combined_ec / 2.0, 3)
+                ec2 = round(combined_ec - ec1, 3)
+            except (ValueError, TypeError):
+                ec1 = h3.get("EC")
+                ec2 = h3.get("EC")
+
+            entry1 = {**h3, "EC": f"{ec1}"}
+            entry2 = {**h3, "EC": f"{ec2}"}
+            all_data = list(all_data[:2]) + [entry1, entry2] + list(all_data[3:])
+
+        # Spring DST: 23 hours expected, 24 provided (index 2 contains non-existent 2:00-3:00 hour)
+        elif expected_hours == 23 and len(all_data) == 24:
+            all_data = list(all_data[:2]) + list(all_data[3:])
+
+        # Renumber all items sequentially 1..expected_hours.
+        # This is essential on DST transition days where Tauron's raw API either repeats "Hour": 3
+        # (Autumn DST, 25 hours with two 3:00 entries) or skips hour 3 (Spring DST), ensuring
+        # distinct, monotonic hourly UTC timestamps without collisions, shifts, or negative deltas.
+        if len(all_data) == expected_hours:
+            for idx, item in enumerate(all_data, start=1):
+                item["Hour"] = idx
+
+        data["data"]["allData"] = all_data
+
+    @staticmethod
+    def add_all_data(data: dict, date: datetime.date | datetime.datetime):
+        if isinstance(date, datetime.datetime):
+            date = date.date()
         all_datas = []
-        zone = list(data['data']['zonesName'].keys())[0]
-        for i, v in enumerate(data["data"]["values"]):
-            if len(data['data']['zonesName']) > 0:
-                selected_zones = list(filter(lambda item: item[1][i], data["data"]["chartZones"].items()))
-                if len(selected_zones) > 0:
-                    zone = selected_zones[0][0]
+        raw_values = data["data"].get("values", [])
+        chart_zones = data["data"].get("chartZones", {})
+        zones_name = data["data"].get("zonesName", {})
+        zone = list(zones_name.keys())[0] if zones_name else "1"
+
+        expected_hours = TauronAmiplusConnector.get_expected_hours_for_day(date)
+
+        # Autumn DST: 24 raw values -> expand index 2 into two entries
+        if expected_hours == 25 and len(raw_values) == 24:
+            try:
+                combined = float(raw_values[2])
+                v1 = round(combined / 2.0, 3)
+                v2 = round(combined - v1, 3)
+            except (ValueError, TypeError):
+                v1 = raw_values[2]
+                v2 = raw_values[2]
+            values = list(raw_values[:2]) + [f"{v1}", f"{v2}"] + list(raw_values[3:])
+            expanded_zones = {}
+            for z_k, flags in chart_zones.items():
+                if len(flags) == 24:
+                    expanded_zones[z_k] = list(flags[:2]) + [flags[2], flags[2]] + list(flags[3:])
+                else:
+                    expanded_zones[z_k] = flags
+            chart_zones = expanded_zones
+        # Spring DST: 24 raw values -> remove index 2
+        elif expected_hours == 23 and len(raw_values) == 24:
+            values = list(raw_values[:2]) + list(raw_values[3:])
+            expanded_zones = {}
+            for z_k, flags in chart_zones.items():
+                if len(flags) == 24:
+                    expanded_zones[z_k] = list(flags[:2]) + list(flags[3:])
+                else:
+                    expanded_zones[z_k] = flags
+            chart_zones = expanded_zones
+        else:
+            values = list(raw_values)
+
+        for i, v in enumerate(values):
+            if len(zones_name) > 0 and chart_zones:
+                selected_zones = [
+                    z for z, flags in chart_zones.items()
+                    if i < len(flags) and flags[i]
+                ]
+                if selected_zones:
+                    zone = selected_zones[0]
             all_datas.append({
                 "EC": v,
                 "Date": date.strftime("%Y-%m-%d"),
@@ -554,11 +756,68 @@ class TauronAmiplusConnector:
 
 class DailyDataCache:
 
-    def __init__(self, meter_id):
-        self._consumption_data = dict()
-        self._generation_data = dict()
-        self._max_date = datetime.datetime.now() + datetime.timedelta(days=1)
+    def __init__(
+        self,
+        meter_id: str,
+        hass: HomeAssistant | None = None,
+        storage_key: str | None = None,
+    ):
+        self._consumption_data: dict[str, Any] = dict()
+        self._generation_data: dict[str, Any] = dict()
         self._meter_id = meter_id
+        self._hass = hass
+        self._storage_key = storage_key
+        self._store = (
+            Store(hass, STORAGE_VERSION, f"{storage_key}_daily_cache")
+            if hass is not None and storage_key is not None
+            else None
+        )
+        self._loaded = False
+        self._dirty = False
+
+    @staticmethod
+    def _get_cache_stats(data: dict) -> tuple[int, str, str, float]:
+        cons = data.get("consumption", {})
+        gen = data.get("generation", {})
+        all_dates = sorted(set(cons.keys()) | set(gen.keys()))
+        count = len(all_dates)
+        min_date = all_dates[0] if all_dates else "none"
+        max_date = all_dates[-1] if all_dates else "none"
+        size_kb = len(json.dumps(data)) / 1024.0
+        return count, min_date, max_date, size_kb
+
+    async def async_load(self) -> None:
+        if self._loaded or self._store is None:
+            return
+        stored = await self._store.async_load()
+        if stored:
+            self._consumption_data = stored.get("consumption", {})
+            self._generation_data = stored.get("generation", {})
+            count, min_date, max_date, size_kb = self._get_cache_stats(stored)
+            _LOGGER.info(
+                f"[{self._meter_id}] Cache loaded from .storage/{self._storage_key}_daily_cache: "
+                f"{count} days cached (range: {min_date} to {max_date}, size: {size_kb:.1f} KB)"
+            )
+        else:
+            _LOGGER.info(
+                f"[{self._meter_id}] No existing cache file found in .storage. A new persistent cache will be initialized."
+            )
+        self._loaded = True
+
+    async def async_save(self) -> None:
+        if not self._dirty or self._store is None:
+            return
+        data = {
+            "consumption": self._consumption_data,
+            "generation": self._generation_data,
+        }
+        await self._store.async_save(data)
+        self._dirty = False
+        count, min_date, max_date, size_kb = self._get_cache_stats(data)
+        _LOGGER.info(
+            f"[{self._meter_id}] Cache saved to .storage: "
+            f"{count} total days cached (range: {min_date} to {max_date}, size: {size_kb:.1f} KB)"
+        )
 
     def __contains__(self, item: Tuple[str, bool]):
         date_str, generation = item
@@ -566,7 +825,7 @@ class DailyDataCache:
             return date_str in self._generation_data
         return date_str in self._consumption_data
 
-    def add_value(self, date: datetime.datetime, generation: bool, value):
+    def add_value(self, date: datetime.datetime | datetime.date, generation: bool, value):
         date_str = self._format_date(date)
         if value is None:
             return
@@ -574,10 +833,9 @@ class DailyDataCache:
             self._generation_data[date_str] = value
         else:
             self._consumption_data[date_str] = value
-        if self._max_date is None or self._max_date > date:
-            self._max_date = date
+        self._dirty = True
 
-    def get_value(self, date: datetime.datetime, generation: bool):
+    def get_value(self, date: datetime.datetime | datetime.date, generation: bool):
         date_str = self._format_date(date)
         if (date_str, generation) in self:
             if generation:
@@ -585,19 +843,30 @@ class DailyDataCache:
             return self._consumption_data[date_str]
         return None
 
-    def delete_older_than(self, date: datetime.datetime):
-        if date > self._max_date:
-            for d in [self._max_date + datetime.timedelta(days=x) for x in range((date - self._max_date).days)]:
-                self.delete_day(d)
-            self._max_date = date
+    def delete_older_than(self, cutoff_date: datetime.datetime | datetime.date):
+        cutoff_str = self._format_date(cutoff_date)
+        for d in list(self._consumption_data.keys()):
+            if d < cutoff_str:
+                self.delete_day_str(d)
+        for d in list(self._generation_data.keys()):
+            if d < cutoff_str:
+                self.delete_day_str(d)
 
-    def delete_day(self, date: datetime.datetime):
+    def delete_day(self, date: datetime.datetime | datetime.date):
         date_str = self._format_date(date)
-        self.log(f"Deleting data from cache for day: {date_str}")
+        self.delete_day_str(date_str)
+
+    def delete_day_str(self, date_str: str):
+        deleted = False
         if date_str in self._generation_data:
             self._generation_data.pop(date_str)
+            deleted = True
         if date_str in self._consumption_data:
             self._consumption_data.pop(date_str)
+            deleted = True
+        if deleted:
+            self._dirty = True
+            self.log(f"Deleting data from cache for day: {date_str}")
 
     def clear(self) -> None:
         self.log(
@@ -605,9 +874,10 @@ class DailyDataCache:
         )
         self._generation_data.clear()
         self._consumption_data.clear()
+        self._dirty = True
 
     @staticmethod
-    def _format_date(date):
+    def _format_date(date: datetime.datetime | datetime.date):
         return date.strftime("%Y-%m-%d")
 
     def log(self, msg):

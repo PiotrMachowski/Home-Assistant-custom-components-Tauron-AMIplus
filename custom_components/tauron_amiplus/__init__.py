@@ -1,6 +1,7 @@
 """Support for Tauron sensors."""
 import datetime
 import logging
+import time
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
@@ -70,6 +71,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConf
     else:
         show_configurable = False
 
+    start_time = time.monotonic()
+    _LOGGER.info(
+        f"[{meter_id}] Initializing Tauron AMIplus (Meter: {meter_name}, Tariff: {tariff}, "
+        f"Options: balanced={show_balanced}, generation={show_generation_sensors}, statistics={store_statistics})"
+    )
+
     tauron_amiplus_update_coordinator = TauronAmiplusUpdateCoordinator(
         hass,
         config_entry.entry_id,
@@ -84,17 +91,22 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConf
         show_configurable=show_configurable,
         show_configurable_date=show_configurable_date,
         store_statistics=store_statistics,
+        config_entry=config_entry,
     )
     config_entry.runtime_data = TauronAmiplusRuntimeData(tauron_amiplus_update_coordinator)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     register_all_services(hass)
     await tauron_amiplus_update_coordinator.async_request_refresh()
+    elapsed = time.monotonic() - start_time
+    _LOGGER.info(f"[{meter_id}] Integration setup completed in {elapsed:.2f}s")
     return True
 
 
 async def async_unload_entry(hass, config_entry) -> bool:
     """Unload a config entry."""
+    if hasattr(config_entry, "runtime_data") and config_entry.runtime_data is not None:
+        await config_entry.runtime_data.coordinator.connector.async_save_cache()
     await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
     return True
 

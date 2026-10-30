@@ -177,6 +177,14 @@ class TauronAmiplusFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 }
 
                 """Finish config flow"""
+                if self.source == config_entries.SOURCE_REAUTH:
+                    return self.async_update_reload_and_abort(
+                        self._get_reauth_entry(),
+                        title=f"eLicznik {user_input[CONF_METER_NAME]}",
+                        data=data,
+                        options=options,
+                    )
+
                 return self.async_create_entry(
                     title=f"eLicznik {user_input[CONF_METER_NAME]}",
                     data=data,

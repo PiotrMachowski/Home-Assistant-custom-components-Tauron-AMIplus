@@ -4,8 +4,9 @@ import logging
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.const import CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME, UnitOfEnergy
+from homeassistant.components.sensor import PLATFORM_SCHEMA, RestoreSensor, SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.const import (CONF_MONITORED_VARIABLES, CONF_NAME, CONF_PASSWORD, CONF_USERNAME,
+                                 STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfEnergy)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .connector import TauronAmiplusRawData
@@ -98,11 +99,11 @@ async def async_setup_entry(hass, entry: TauronAmiplusConfigEntry, async_add_ent
                 meter_name
             )
         )
+    async_add_entities(sensors, False)
+    _LOGGER.info(f"[{meter_id}] Registered {len(sensors)} sensors")
 
-    async_add_entities(sensors, True)
 
-
-class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
+class TauronAmiplusSensor(RestoreSensor, CoordinatorEntity):
 
     def __init__(self, coordinator: TauronAmiplusUpdateCoordinator, name: str, meter_id: str, sensor_type: str,
                  state_class: SensorStateClass):
@@ -116,6 +117,34 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         self._tariff = None
         self._params = {}
         self._state = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self.coordinator.data is None:
+            last_state = await self.async_get_last_state()
+            if last_state is not None and last_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                try:
+                    self._state = float(last_state.state)
+                except (ValueError, TypeError):
+                    self._state = last_state.state
+                reserved_attrs = {
+                    "state_class",
+                    "unit_of_measurement",
+                    "device_class",
+                    "icon",
+                    "friendly_name",
+                    "supported_features",
+                    "restored",
+                    "tariff",
+                }
+                self._params = {
+                    k: v for k, v in last_state.attributes.items() if k not in reserved_attrs
+                }
+                self._tariff = last_state.attributes.get("tariff")
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._state is not None
 
     @property
     def name(self):
@@ -252,7 +281,7 @@ class TauronAmiplusSensor(SensorEntity, CoordinatorEntity):
         for consumption, generation in zip(consumption_data, generation_data):
             value_consumption = float(consumption["EC"])
             value_generation = float(generation["EC"])
-            zone = zone_names[consumption["Zone"]]
+            zone = zone_names.get(consumption["Zone"], f"zone_{consumption['Zone']}")
             balance = value_consumption - value_generation
             if balance > 0:
                 sum_consumption += balance
@@ -296,7 +325,6 @@ class TauronAmiplusConfigFlowSensor(TauronAmiplusSensor):
             "manufacturer": "TAURON",
             "model": self._meter_id,
             "sw_version": f"Tariff {self._tariff}",
-            "via_device": None,
             "configuration_url": CONST_URL_SERVICE,
         }
 

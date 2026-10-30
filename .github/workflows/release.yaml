@@ -2,7 +2,13 @@ name: Release
 
 on:
   release:
-    types: [published]
+    types: [published, prereleased]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name (e.g. v3.0.0-b0)'
+        required: false
+        default: 'v3.0.0-b0'
 
 env:
   COMPONENT_NAME: tauron_amiplus
@@ -16,12 +22,12 @@ jobs:
       id-token: write
     steps:
       - name: Download repo
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v7
 
       - name: Adjust version number
         shell: bash
         run: |
-          version="${{ github.event.release.tag_name }}"
+          version="${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}"
           yq e -P -o=json \
             -i ".version = \"${version}\"" \
             "${{ github.workspace }}/custom_components/${{ env.COMPONENT_NAME }}/manifest.json"
@@ -35,4 +41,5 @@ jobs:
       - name: Upload zip to release
         uses: softprops/action-gh-release@v2.1.0
         with:
+          tag_name: ${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}
           files: ${{ github.workspace }}/custom_components/${{ env.COMPONENT_NAME }}/${{ env.COMPONENT_NAME }}.zip

@@ -39,8 +39,14 @@ class DownloadStatisticsService:
             _LOGGER.error(f"Failed to download statistics, date from the future: {start_date}")
             return
         device = device_registry.async_get(call.data["device_id"])
-        [config_entry_id, *_] = device.config_entries
+        if device is None or not device.config_entries:
+            _LOGGER.error(f"Device not found or has no config entries: {call.data['device_id']}")
+            return
+        config_entry_id = next(iter(device.config_entries))
         config_entry = self._hass.config_entries.async_get_entry(config_entry_id)
+        if config_entry is None:
+            _LOGGER.error(f"Config entry not found: {config_entry_id}")
+            return
         await TauronAmiplusStatisticsUpdater.manually_update(self._hass, start_date, config_entry)
 
 
@@ -58,12 +64,19 @@ class ClearCacheService:
     async def async_handle_service(self, call: ServiceCall) -> None:
         device_registry = dr.async_get(self._hass)
         device = device_registry.async_get(call.data["device_id"])
-        [config_entry_id, *_] = device.config_entries
+        if device is None or not device.config_entries:
+            _LOGGER.error(f"Device not found or has no config entries: {call.data['device_id']}")
+            return
+        config_entry_id = next(iter(device.config_entries))
         config_entry: TauronAmiplusConfigEntry = self._hass.config_entries.async_get_entry(config_entry_id)
-        config_entry.runtime_data.coordinator.connector.clear_cache()
+        if config_entry is None:
+            _LOGGER.error(f"Config entry not found: {config_entry_id}")
+            return
+        await config_entry.runtime_data.coordinator.connector.async_clear_cache()
 
 
 def register_all_services(hass: HomeAssistant) -> None:
     services = [DownloadStatisticsService(hass), ClearCacheService(hass)]
     for service in services:
-        hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
+        if not hass.services.has_service(service.domain, service.service):
+            hass.services.async_register(service.domain, service.service, service.async_handle_service, service.schema)
