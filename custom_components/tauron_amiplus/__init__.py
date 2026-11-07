@@ -89,7 +89,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: TauronAmiplusConf
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
     config_entry.async_on_unload(config_entry.add_update_listener(async_reload_entry))
     register_all_services(hass)
-    await tauron_amiplus_update_coordinator.async_request_refresh()
+    # Run the first (slow) download in the background so it can't block or time out HA startup.
+    config_entry.async_create_background_task(
+        hass,
+        tauron_amiplus_update_coordinator.async_request_refresh(),
+        "tauron_amiplus_first_refresh",
+    )
     return True
 
 
