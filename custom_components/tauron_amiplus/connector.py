@@ -130,9 +130,15 @@ class TauronAmiplusConnector:
         self._cache = DailyDataCache(meter_id)
         self._hass = hass
         self._storage_key = f"{STORAGE_KEY_PREFIX}_{config_entry_id}" if config_entry_id is not None else None
+        # Persistent copy of the daily cache, so a restart doesn't re-download every day again.
+        self._cache_loaded = False
+        self._cache_store = None
+        if hass is not None and self._storage_key is not None:
+            self._cache_store = Store(hass, STORAGE_VERSION, f"{self._storage_key}_daily_cache")
 
     async def get_raw_data(self) -> TauronAmiplusRawData:
         data = TauronAmiplusRawData()
+        await self._load_cache()
         # data.payments = await self.get_moj_tauron()
         data.tariff = await self.login()
         generation_max_cache = datetime.datetime.now()
@@ -142,7 +148,27 @@ class TauronAmiplusConnector:
         else:
             data.generation = TauronAmiplusDataSet()
         self._cache.delete_older_than(min(consumption_max_cache, generation_max_cache))
+        self._schedule_cache_save()
         return data
+
+    async def _load_cache(self) -> None:
+        if self._cache_loaded:
+            return
+        self._cache_loaded = True
+        if self._cache_store is None:
+            return
+        try:
+            stored = await self._cache_store.async_load()
+            if stored and stored.get("meter_id") == self._meter_id:
+                self._cache.load(stored)
+                self.log("Loaded daily cache from storage")
+        except Exception as err:  # a broken cache file must never block the setup
+            _LOGGER.warning("Ignoring unreadable tauron_amiplus daily cache: %s", err)
+
+    def _schedule_cache_save(self) -> None:
+        # Delayed save: writes at most every 30 s, and HA also flushes it on shutdown.
+        if self._cache_store is not None:
+            self._cache_store.async_delay_save(lambda: self._cache.dump(self._meter_id), 30)
 
     async def get_data_set(self, generation) -> Tuple[TauronAmiplusDataSet, datetime.datetime]:
         dataset = TauronAmiplusDataSet()
@@ -166,7 +192,7 @@ class TauronAmiplusConnector:
             end = datetime.datetime.now()
             start = datetime.datetime.combine(self._show_configurable_date, end.time())
             dataset.json_configurable_hourly = await self.get_raw_values_daily_for_range(start, end, generation)
-            potential_max = end - datetime.timedelta(days=2)
+            potential_max = start - datetime.timedelta(days=2)  # keep the whole configured range cached
             if potential_max < cache_max:
                 cache_max = potential_max
         return dataset, cache_max
@@ -292,6 +318,7 @@ class TauronAmiplusConnector:
 
     def clear_cache(self) -> None:
         self._cache.clear()
+        self._schedule_cache_save()
 
     @staticmethod
     def _get_meters(text: str) -> list:
@@ -434,6 +461,7 @@ class TauronAmiplusConnector:
                     v["Date"] = day.strftime("%Y-%m-%d")
             if all(self.contains_data(a) for a in values["data"]["allData"]):
                 self._cache.add_value(day, generation, values)
+                self._schedule_cache_save()
             values["data"]["allData"] = [
                 d for d in values["data"]["allData"] if self.contains_data(d)
             ]
@@ -598,6 +626,24 @@ class DailyDataCache:
             self._generation_data.pop(date_str)
         if date_str in self._consumption_data:
             self._consumption_data.pop(date_str)
+
+    def dump(self, meter_id) -> dict:
+        return {
+            "meter_id": meter_id,
+            "consumption": dict(self._consumption_data),
+            "generation": dict(self._generation_data),
+        }
+
+    def load(self, stored: dict) -> None:
+        self._consumption_data = dict(stored.get("consumption", {}))
+        self._generation_data = dict(stored.get("generation", {}))
+        dates = [
+            datetime.datetime.strptime(d, "%Y-%m-%d")
+            for d in [*self._consumption_data, *self._generation_data]
+        ]
+        # keep the pruning logic working: _max_date must be the oldest cached day
+        self._max_date = min([self._max_date, *dates])
+        self.log(f"Loaded cache: consumption - {len(self._consumption_data)}, generation - {len(self._generation_data)}")
 
     def clear(self) -> None:
         self.log(
