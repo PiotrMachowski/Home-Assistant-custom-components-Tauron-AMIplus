@@ -327,9 +327,7 @@ class TauronAmiplusOptionsFlowHandler(config_entries.OptionsFlow):
                 errors[CONF_SHOW_CONFIGURABLE_DATE] = "missing_configurable_start_date"
             if len(errors) == 0:
                 self.options.update(user_input)
-                output = await self._update_options()
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-                return output
+                return await self._update_options()
 
         return self.async_show_form(
             step_id="user",

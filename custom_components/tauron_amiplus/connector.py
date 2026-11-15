@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import datetime
+import functools
 import json
 import logging
 import re
@@ -184,7 +185,7 @@ class TauronAmiplusConnector:
             end = datetime.datetime.now()
             start = datetime.datetime.combine(self._show_configurable_date, end.time())
             dataset.json_configurable_hourly = await self.get_raw_values_daily_for_range(start, end, generation)
-            potential_max = end - datetime.timedelta(days=2)
+            potential_max = start - datetime.timedelta(days=2)
             if potential_max < cache_max:
                 cache_max = potential_max
         return dataset, cache_max
@@ -452,7 +453,11 @@ class TauronAmiplusConnector:
             "zones": {},
             "zonesName": {}
         }}
-        for day in [day_from + datetime.timedelta(days=x) for x in range((day_to - day_from).days + 1)]:
+        for idx, day in enumerate(
+            [day_from + datetime.timedelta(days=x) for x in range((day_to - day_from).days + 1)]
+        ):
+            if idx > 0 and idx % 50 == 0:
+                await asyncio.sleep(0)
             day_data = await self.get_raw_values_daily_for_day(day, generation)
             if day_data is not None:
                 day_all_data = day_data["data"].get("allData", [])
@@ -642,13 +647,18 @@ class TauronAmiplusConnector:
         raise Exception("Failed to calculate configuration")
 
     @staticmethod
-    def get_expected_hours_for_day(date: datetime.date | datetime.datetime) -> int:
-        if isinstance(date, datetime.datetime):
-            date = date.date()
+    @functools.lru_cache(maxsize=512)
+    def _get_expected_hours_for_date(date: datetime.date) -> int:
         zone = get_time_zone("Europe/Warsaw")
         start = datetime.datetime.combine(date, datetime.time(0, 0), tzinfo=zone)
         end = datetime.datetime.combine(date + datetime.timedelta(days=1), datetime.time(0, 0), tzinfo=zone)
         return int((as_utc(end) - as_utc(start)).total_seconds() // 3600)
+
+    @staticmethod
+    def get_expected_hours_for_day(date: datetime.date | datetime.datetime) -> int:
+        if isinstance(date, datetime.datetime):
+            date = date.date()
+        return TauronAmiplusConnector._get_expected_hours_for_date(date)
 
     @staticmethod
     def normalize_daily_data(data: dict, date: datetime.date | datetime.datetime) -> None:

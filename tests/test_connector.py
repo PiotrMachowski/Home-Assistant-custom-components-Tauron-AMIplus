@@ -473,3 +473,25 @@ async def test_execute_post_retry_on_client_os_error(mocker):
     assert mock_session.request.call_count == 2
 
 
+async def test_configurable_date_cache_retention(mocker):
+    """Ensure configurable period start date is preserved in cache_max calculation."""
+    configurable_start = datetime.date(2025, 4, 1)
+    connector = TauronAmiplusConnector(
+        "user",
+        "pass",
+        "12345",
+        show_configurable=True,
+        show_configurable_date=configurable_start,
+    )
+    mocker.patch.object(connector, "get_reading", return_value={"reading": 1})
+    mocker.patch.object(connector, "get_values_daily", return_value=({"daily": 1}, "2026-11-14"))
+    mocker.patch.object(connector, "get_values_monthly", return_value={"monthly": 1})
+    mocker.patch.object(connector, "get_values_yearly", return_value={"yearly": 1})
+    mocker.patch.object(connector, "get_raw_values_daily_for_range", return_value={"configurable": 1})
+
+    _, cache_max = await connector.get_data_set(generation=False)
+    # cache_max must be older than or equal to configurable_start so cached days in the configurable period are not deleted
+    assert cache_max.date() <= configurable_start
+
+
+
