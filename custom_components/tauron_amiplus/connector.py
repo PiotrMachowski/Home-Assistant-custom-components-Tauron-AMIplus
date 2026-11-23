@@ -238,7 +238,7 @@ class TauronAmiplusConnector:
         if stored_data is None:
             return False, None, session
         cookies = {k: v for k, v in stored_data.get("cookies", {}).items() if k in ["PHPSESSID", "ASP.NET_SessionId"]}
-        self.log(f"COOKIES ({service}): {cookies}")
+        self.log(f"COOKIES ({service}): {list(cookies)}")
         session.cookie_jar.clear(lambda x: True)
         session.cookie_jar.update_cookies(cookies)
 
@@ -262,7 +262,7 @@ class TauronAmiplusConnector:
         self.log(f"SAVING SESSION {self._storage_key}_{slugify(service)}")
         store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
         cookies = {cookie.key: cookie.value for cookie in session.cookie_jar if cookie.key in ["PHPSESSID", "ASP.NET_SessionId"]}
-        self.log(f"SAVED COOKIES ({service}) {cookies}")
+        self.log(f"SAVED COOKIES ({service}) {list(cookies)}")
         await store.async_save({"cookies": cookies})
 
     async def validate_session(self, session: ClientSession, service: str) -> (bool, str):
