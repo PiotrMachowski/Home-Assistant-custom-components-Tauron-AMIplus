@@ -218,8 +218,7 @@ class TauronAmiplusStatisticsUpdater:
             "unit_class": "energy",
         }
         statistic_data = []
-        for raw_hour in raw_data:
-            start = self.get_time(raw_hour)
+        for raw_hour, start in zip(raw_data, self.get_times(raw_data)):
             if last_stats_time is not None and start <= last_stats_time:
                 continue
             usage = float(raw_hour["EC"])
@@ -256,6 +255,26 @@ class TauronAmiplusStatisticsUpdater:
 
     def log(self, msg):
         _LOGGER.debug(f"[{self.meter_id}]: {msg}")
+
+    @staticmethod
+    def get_times(raw_data):
+        """Return start times for consecutive hourly entries.
+
+        On the autumn DST change the hour 02:00-03:00 happens twice and eLicznik returns two entries with the same
+        "Hour". The second one is mapped to the second occurrence of that local time (fold=1), so both hours get
+        separate statistics rows.
+        """
+        times = []
+        previous = None
+        for raw_hour in raw_data:
+            time = TauronAmiplusStatisticsUpdater.get_time(raw_hour)
+            if previous is not None and as_utc(time) <= as_utc(previous):
+                folded = time.replace(fold=1)
+                if as_utc(folded) > as_utc(previous):
+                    time = folded
+            times.append(time)
+            previous = time
+        return times
 
     @staticmethod
     def get_time(raw_hour):
