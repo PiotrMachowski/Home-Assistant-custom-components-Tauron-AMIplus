@@ -156,7 +156,7 @@ class TauronAmiplusConnector:
         cache_max = datetime.datetime.now() - datetime.timedelta(days=32)
         if self._show_12_months:
             dataset.json_last_12_months_hourly = await self.get_values_12_months_hourly(generation)
-            cache_max = now.replace(year=now.year - 1) - datetime.timedelta(days=2)
+            cache_max = TauronAmiplusConnector.one_year_before(now) - datetime.timedelta(days=2)
         if self._show_balanced_yearly:
             dataset.json_year_hourly = await self.get_values_year_hourly(generation)
             potential_max = now.replace(day=1, month=1)
@@ -238,7 +238,7 @@ class TauronAmiplusConnector:
         if stored_data is None:
             return False, None, session
         cookies = {k: v for k, v in stored_data.get("cookies", {}).items() if k in ["PHPSESSID", "ASP.NET_SessionId"]}
-        self.log(f"COOKIES ({service}): {cookies}")
+        self.log(f"COOKIES ({service}): {list(cookies)}")
         session.cookie_jar.clear(lambda x: True)
         session.cookie_jar.update_cookies(cookies)
 
@@ -262,7 +262,7 @@ class TauronAmiplusConnector:
         self.log(f"SAVING SESSION {self._storage_key}_{slugify(service)}")
         store = Store(self._hass, STORAGE_VERSION, f"{self._storage_key}_{slugify(service)}")
         cookies = {cookie.key: cookie.value for cookie in session.cookie_jar if cookie.key in ["PHPSESSID", "ASP.NET_SessionId"]}
-        self.log(f"SAVED COOKIES ({service}) {cookies}")
+        self.log(f"SAVED COOKIES ({service}) {list(cookies)}")
         await store.async_save({"cookies": cookies})
 
     async def validate_session(self, session: ClientSession, service: str) -> (bool, str):
@@ -379,7 +379,7 @@ class TauronAmiplusConnector:
 
     async def get_values_12_months_hourly(self, generation):
         now = datetime.datetime.now()
-        start_day = now.replace(year=now.year - 1)
+        start_day = TauronAmiplusConnector.one_year_before(now)
         return await self.get_raw_values_daily_for_range(start_day, now, generation)
 
     async def get_raw_values_daily_for_range(self, day_from: datetime.date, day_to: datetime.date, generation):
@@ -507,6 +507,14 @@ class TauronAmiplusConnector:
         except Exception as err:
             _LOGGER.error("Error during downloading. %s", err)
             return []
+
+    @staticmethod
+    def one_year_before(date):
+        """Same date one year earlier; 29 February becomes 28 February."""
+        try:
+            return date.replace(year=date.year - 1)
+        except ValueError:
+            return date.replace(year=date.year - 1, day=28)
 
     @staticmethod
     def format_date(date):
