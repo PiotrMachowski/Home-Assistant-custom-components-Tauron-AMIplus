@@ -350,17 +350,17 @@ class TauronAmiplusConnector:
         return values
 
     async def get_values_daily(self, generation):
-        offset = 1
-        data = None
-        day = None
-        while offset <= CONST_MAX_LOOKUP_RANGE and data is None:
-            data, day = await self.get_raw_values_daily(offset, generation)
-            offset += 1
-        return data, day
-
-    async def get_raw_values_daily(self, days_before, generation):
-        day = datetime.datetime.now() - datetime.timedelta(days_before)
-        return await self.get_raw_values_daily_for_day(day, generation), TauronAmiplusConnector.format_date(day)
+        fallback = None, None
+        for offset in range(1, CONST_MAX_LOOKUP_RANGE + 1):
+            day = datetime.datetime.now() - datetime.timedelta(offset)
+            data = await self.get_raw_values_daily_for_day(day, generation)
+            # Only complete days (every hourly entry has data) are cached; eLicznik answers for
+            # the previous day before that, first with all hours null, then with only some hours.
+            if self._cache.get_value(day, generation) is not None:
+                return data, TauronAmiplusConnector.format_date(day)
+            if fallback[0] is None:
+                fallback = data, TauronAmiplusConnector.format_date(day)
+        return fallback
 
     async def get_values_month_hourly(self, generation):
         now = datetime.datetime.now()
